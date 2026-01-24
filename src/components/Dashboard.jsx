@@ -1,14 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import './Dashboard.css';
+
 
 const Dashboard = () => {
   // Emergency contact buttons handler
   const handleEmergencyAction = (action) => {
     let message = '';
     let confirmMessage = '';
-    
-    switch(action) {
+
+    switch (action) {
       case 'call911':
         confirmMessage = 'Call 911 emergency services?';
         message = 'Calling 911... Please wait for emergency services.';
@@ -24,14 +24,14 @@ const Dashboard = () => {
       default:
         return;
     }
-    
-    if(window.confirm(confirmMessage)) {
+
+    if (window.confirm(confirmMessage)) {
       alert(message);
     }
   };
 
   const handleSOSClick = (e) => {
-    if(!window.confirm('Are you sure you want to activate emergency SOS? This will alert your emergency contacts.')) {
+    if (!window.confirm('Are you sure you want to activate emergency SOS? This will alert your emergency contacts.')) {
       e.preventDefault();
     }
   };
@@ -47,7 +47,7 @@ const Dashboard = () => {
           <p>Your complete health dashboard</p>
         </div>
       </header>
-      
+
       {/* Emergency Card */}
       <div className="emergency-card">
         <div className="emergency-info">
@@ -56,20 +56,20 @@ const Dashboard = () => {
           <p><strong>Primary:</strong> John (Son) - (555) 123-4567</p>
           <p><strong>Secondary:</strong> Sarah (Daughter) - (555) 987-6543</p>
           <div className="emergency-contact">
-            <button 
-              className="contact-btn call" 
+            <button
+              className="contact-btn call"
               onClick={() => handleEmergencyAction('call911')}
             >
               <i className="fas fa-phone"></i> Call 911
             </button>
-            <button 
-              className="contact-btn" 
+            <button
+              className="contact-btn"
               onClick={() => handleEmergencyAction('alertDoctor')}
             >
               <i className="fas fa-user-md"></i> Alert Doctor
             </button>
-            <button 
-              className="contact-btn" 
+            <button
+              className="contact-btn"
               onClick={() => handleEmergencyAction('notifyFamily')}
             >
               <i className="fas fa-users"></i> Notify Family
@@ -77,13 +77,13 @@ const Dashboard = () => {
           </div>
         </div>
         <div>
-          <Link to="/emergency" className="sos-button" style={{width: '100px', height: '100px', margin: '0'}} onClick={handleSOSClick}>
+          <Link to="/emergency" className="sos-button" onClick={handleSOSClick}>
             <i className="fas fa-plus"></i>
             <span>SOS</span>
           </Link>
         </div>
       </div>
-      
+
       <div className="dashboard-grid">
         {/* Health Overview Card */}
         <Link to="/health-overview" className="dashboard-card">
@@ -105,7 +105,7 @@ const Dashboard = () => {
             <div className="view-link">View Details <i className="fas fa-arrow-right"></i></div>
           </div>
         </Link>
-        
+
         {/* Health Log Card */}
         <Link to="/health-log" className="dashboard-card">
           <div className="card-header">
@@ -126,7 +126,7 @@ const Dashboard = () => {
             <div className="view-link">View Log <i className="fas fa-arrow-right"></i></div>
           </div>
         </Link>
-        
+
         {/* Trends Card */}
         <Link to="/trends" className="dashboard-card">
           <div className="card-header">
@@ -147,7 +147,7 @@ const Dashboard = () => {
             <div className="view-link">View Trends <i className="fas fa-arrow-right"></i></div>
           </div>
         </Link>
-        
+
         {/* Appointments Card */}
         <Link to="/appointments" className="dashboard-card">
           <div className="card-header">
@@ -168,7 +168,7 @@ const Dashboard = () => {
             <div className="view-link">View All <i className="fas fa-arrow-right"></i></div>
           </div>
         </Link>
-        
+
         {/* Health Reminder Card */}
         <Link to="/reminders" className="dashboard-card">
           <div className="card-header">
@@ -189,7 +189,7 @@ const Dashboard = () => {
             <div className="view-link">View Reminders <i className="fas fa-arrow-right"></i></div>
           </div>
         </Link>
-        
+
         {/* Weekly Average Card */}
         <Link to="/weekly-average" className="dashboard-card">
           <div className="card-header">
@@ -211,7 +211,7 @@ const Dashboard = () => {
           </div>
         </Link>
       </div>
-      
+
       {/* Fixed SOS Button */}
       <div className="sos-button-container">
         <Link to="/emergency" className="sos-button" onClick={handleSOSClick}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './EmergencySOS.css';
+
 
 const EmergencySOS = () => {
   const [countdownActive, setCountdownActive] = useState(false);
@@ -80,13 +80,13 @@ const EmergencySOS = () => {
 
   const activateSOS = () => {
     if (countdownActive) return;
-    
+
     const confirmed = window.confirm(
       'ACTIVATE EMERGENCY SOS?\n\nThis will:\n1. Call 911\n2. Alert all emergency contacts\n3. Share your location\n4. Send your medical information\n\nPress OK to activate emergency response.'
     );
-    
+
     if (!confirmed) return;
-    
+
     setCountdownActive(true);
   };
 
@@ -100,7 +100,7 @@ const EmergencySOS = () => {
       setEmergencyActivated(true);
       alert('EMERGENCY RESPONSE ACTIVATED!\n\n1. 911 has been called\n2. Emergency contacts notified\n3. Your location shared: 123 Main St, Apt 4B\n4. Medical information sent to responders\n\nStay calm. Help is on the way.');
     }
-    
+
     return () => clearInterval(interval);
   }, [countdownActive, seconds]);
 
@@ -131,10 +131,10 @@ const EmergencySOS = () => {
         <h1><i className="fas fa-exclamation-triangle"></i> EMERGENCY SOS <i className="fas fa-exclamation-triangle"></i></h1>
         <p>This page is for emergencies only. Press the SOS button to alert your contacts and emergency services.</p>
       </div>
-      
+
       {/* Main SOS Button */}
       <div className="main-sos-container">
-        <button 
+        <button
           className="main-sos-button"
           onMouseDown={startPress}
           onTouchStart={startPress}
@@ -148,7 +148,7 @@ const EmergencySOS = () => {
         </button>
         <p className="sos-instruction">Press and hold for 3 seconds to activate emergency response</p>
       </div>
-      
+
       {/* Countdown Timer */}
       {countdownActive && (
         <div className="countdown-section">
@@ -160,21 +160,21 @@ const EmergencySOS = () => {
             </>
           ) : (
             <>
-              <div className="countdown-title" style={{color: '#10b981'}}>Emergency Response Activated!</div>
-              <div style={{fontSize: '48px', color: '#10b981', margin: '20px 0'}}>
+              <div className="countdown-title success-text">Emergency Response Activated!</div>
+              <div className="success-icon">
                 <i className="fas fa-check-circle"></i>
               </div>
               <div className="countdown-message">
                 <p><strong>Emergency services have been alerted.</strong></p>
                 <p>Your location and medical information have been shared with responders.</p>
                 <p>Your emergency contacts have been notified.</p>
-                <p style={{marginTop: '15px', color: '#fbbf24'}}>Stay calm and wait for assistance.</p>
+                <p className="warning-text">Stay calm and wait for assistance.</p>
               </div>
             </>
           )}
         </div>
       )}
-      
+
       {/* Emergency Contacts */}
       <div className="contacts-section">
         <h2 className="section-title"><i className="fas fa-users"></i> Emergency Contacts</h2>
@@ -196,13 +196,13 @@ const EmergencySOS = () => {
                 </div>
                 <div className="contact-address">{contact.address}</div>
                 <div className="contact-actions">
-                  <button 
+                  <button
                     className="contact-btn call-btn"
                     onClick={() => handleContactAction('call', contact.name, contact.phone)}
                   >
                     <i className="fas fa-phone"></i> Call
                   </button>
-                  <button 
+                  <button
                     className="contact-btn message-btn"
                     onClick={() => handleContactAction('message', contact.name)}
                   >
@@ -214,7 +214,7 @@ const EmergencySOS = () => {
           ))}
         </div>
       </div>
-      
+
       {/* Emergency Services */}
       <div className="services-section">
         <h2 className="section-title"><i className="fas fa-ambulance"></i> Emergency Services</h2>
@@ -226,7 +226,7 @@ const EmergencySOS = () => {
               </div>
               <div className="service-title">{service.title}</div>
               <div className="service-phone">{service.phone}</div>
-              <button 
+              <button
                 className="service-btn"
                 onClick={() => handleServiceCall(service.title)}
               >
@@ -236,7 +236,7 @@ const EmergencySOS = () => {
           ))}
         </div>
       </div>
-      
+
       {/* Emergency Information */}
       <div className="info-section">
         <h3 className="info-title"><i className="fas fa-info-circle"></i> Important Emergency Information</h3>
@@ -250,7 +250,7 @@ const EmergencySOS = () => {
             <li>Allergies: Penicillin, Sulfa drugs</li>
             <li>Insurance: Medicare #123-45-6789A</li>
           </ul>
-          <p style={{marginTop: '15px'}}>Your location is being tracked and will be shared with emergency responders when SOS is activated.</p>
+          <p style={{ marginTop: '15px' }}>Your location is being tracked and will be shared with emergency responders when SOS is activated.</p>
         </div>
       </div>
     </div>

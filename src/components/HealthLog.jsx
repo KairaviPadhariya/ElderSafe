@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import NavHeader from './NavHeader';
-import './HealthLog.css';
+
 
 const HealthLog = () => {
   const [activeDate, setActiveDate] = useState('today');
-  
+
   const logEntries = [
     {
       id: 1,
@@ -87,12 +87,12 @@ const HealthLog = () => {
 
   return (
     <div className="health-log-container">
-      <NavHeader 
-        title="Health Log" 
-        icon="fas fa-clipboard-list" 
+      <NavHeader
+        title="Health Log"
+        icon="fas fa-clipboard-list"
         backLink="/"
       />
-      
+
       <div className="content-section">
         <div className="section-header">
           <div>
@@ -100,25 +100,25 @@ const HealthLog = () => {
             <p>Track your medications, exercises, and health checks</p>
           </div>
           <div className="date-selector">
-            <button 
+            <button
               className={`date-btn ${activeDate === 'today' ? 'active' : ''}`}
               onClick={() => setActiveDate('today')}
             >
               Today
             </button>
-            <button 
+            <button
               className={`date-btn ${activeDate === 'yesterday' ? 'active' : ''}`}
               onClick={() => setActiveDate('yesterday')}
             >
               Yesterday
             </button>
-            <button 
+            <button
               className={`date-btn ${activeDate === 'week' ? 'active' : ''}`}
               onClick={() => setActiveDate('week')}
             >
               This Week
             </button>
-            <button 
+            <button
               className={`date-btn ${activeDate === 'all' ? 'active' : ''}`}
               onClick={() => setActiveDate('all')}
             >
@@ -126,7 +126,7 @@ const HealthLog = () => {
             </button>
           </div>
         </div>
-        
+
         <div className="log-entries">
           {logEntries.map(entry => (
             <div className="log-entry" key={entry.id}>
@@ -145,22 +145,22 @@ const HealthLog = () => {
             </div>
           ))}
         </div>
-        
+
         <button className="add-entry-btn" onClick={handleAddEntry}>
           <i className="fas fa-plus"></i> Add New Health Entry
         </button>
       </div>
-      
+
       <div className="content-section">
         <div className="section-header">
           <h2>Weekly Summary</h2>
           <p>Your activity overview for the past 7 days</p>
         </div>
-        
+
         <div className="log-entries">
           {summaryEntries.map(entry => (
             <div className="log-entry" key={entry.id}>
-              <div className="log-icon" style={{backgroundColor: entry.bgColor, color: entry.iconColor}}>
+              <div className="log-icon" style={{ backgroundColor: entry.bgColor, color: entry.iconColor }}>
                 <i className={entry.icon}></i>
               </div>
               <div className="log-details">

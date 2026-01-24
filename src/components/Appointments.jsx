@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import NavHeader from './NavHeader';
-import './Appointments.css';
+
 
 const Appointments = () => {
   const [activeFilter, setActiveFilter] = useState('all');
-  
+
   const appointments = [
     {
       id: 1,
@@ -84,12 +84,12 @@ const Appointments = () => {
 
   return (
     <div className="appointments-container">
-      <NavHeader 
-        title="Appointments" 
-        icon="fas fa-calendar-alt" 
+      <NavHeader
+        title="Appointments"
+        icon="fas fa-calendar-alt"
         backLink="/"
       />
-      
+
       <div className="content-section">
         <div className="section-header">
           <div>
@@ -97,25 +97,25 @@ const Appointments = () => {
             <p>Manage and track your healthcare visits</p>
           </div>
           <div className="status-filter">
-            <button 
+            <button
               className={`status-btn ${activeFilter === 'all' ? 'active' : ''}`}
               onClick={() => setActiveFilter('all')}
             >
               All
             </button>
-            <button 
+            <button
               className={`status-btn ${activeFilter === 'upcoming' ? 'active' : ''}`}
               onClick={() => setActiveFilter('upcoming')}
             >
               Upcoming
             </button>
-            <button 
+            <button
               className={`status-btn ${activeFilter === 'today' ? 'active' : ''}`}
               onClick={() => setActiveFilter('today')}
             >
               Today
             </button>
-            <button 
+            <button
               className={`status-btn ${activeFilter === 'completed' ? 'active' : ''}`}
               onClick={() => setActiveFilter('completed')}
             >
@@ -123,7 +123,7 @@ const Appointments = () => {
             </button>
           </div>
         </div>
-        
+
         <div className="appointment-cards">
           {filteredAppointments.map(appointment => (
             <div className={`appointment-card ${appointment.type}`} key={appointment.id}>
@@ -138,25 +138,25 @@ const Appointments = () => {
               <div className="appointment-time">
                 <div className="appointment-date">{appointment.time}</div>
                 <span className={`appointment-status status-${appointment.type}`}>
-                  {appointment.type === 'today' ? 'Upcoming' : 
-                   appointment.type === 'upcoming' ? 'Scheduled' : 'Completed'}
+                  {appointment.type === 'today' ? 'Upcoming' :
+                    appointment.type === 'upcoming' ? 'Scheduled' : 'Completed'}
                 </span>
               </div>
             </div>
           ))}
         </div>
-        
+
         <button className="add-appointment-btn" onClick={handleAddAppointment}>
           <i className="fas fa-plus"></i> Schedule New Appointment
         </button>
       </div>
-      
+
       <div className="content-section">
         <div className="section-header">
           <h2>Appointment Statistics</h2>
           <p>Overview of your healthcare visits</p>
         </div>
-        
+
         <div className="stats-grid">
           {stats.map(stat => (
             <div className="stat-card" key={stat.id}>

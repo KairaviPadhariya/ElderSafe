@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import './Reminders.css';
+
 
 const Reminders = () => {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -74,7 +74,7 @@ const Reminders = () => {
   };
 
   const handleDismiss = (id) => {
-    setReminders(reminders.map(reminder => 
+    setReminders(reminders.map(reminder =>
       reminder.id === id ? { ...reminder, status: 'completed' } : reminder
     ));
     alert(`Reminder ${id} marked as completed.`);
@@ -85,7 +85,7 @@ const Reminders = () => {
   };
 
   const getPriorityClass = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return 'priority-high-minimal';
       case 'medium': return 'priority-medium-minimal';
       case 'low': return 'priority-low-minimal';
@@ -94,7 +94,7 @@ const Reminders = () => {
   };
 
   const getStatusClass = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return '';
       case 'pending': return 'pending';
       case 'completed': return 'completed';
@@ -113,7 +113,7 @@ const Reminders = () => {
           <i className="fas fa-bell"></i> Health Reminders
         </div>
       </div>
-      
+
       {/* Header */}
       <div className="reminders-minimal-header">
         <div className="minimal-header-text">
@@ -121,42 +121,42 @@ const Reminders = () => {
           <p>Never miss important health tasks and medications</p>
         </div>
       </div>
-      
+
       {/* Filter Tabs */}
       <div className="minimal-filter-tabs">
-        <button 
+        <button
           className={`minimal-filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
           onClick={() => setActiveFilter('all')}
         >
           All
         </button>
-        <button 
+        <button
           className={`minimal-filter-btn ${activeFilter === 'medication' ? 'active' : ''}`}
           onClick={() => setActiveFilter('medication')}
         >
           Medication
         </button>
-        <button 
+        <button
           className={`minimal-filter-btn ${activeFilter === 'appointment' ? 'active' : ''}`}
           onClick={() => setActiveFilter('appointment')}
         >
           Appointments
         </button>
-        <button 
+        <button
           className={`minimal-filter-btn ${activeFilter === 'health-check' ? 'active' : ''}`}
           onClick={() => setActiveFilter('health-check')}
         >
           Health Checks
         </button>
       </div>
-      
+
       {/* Reminders Grid */}
       <div className="reminders-minimal-grid">
         {filteredReminders.length > 0 ? (
           filteredReminders.map(reminder => (
             <div className="minimal-reminder-card" key={reminder.id}>
               <div className={`reminder-status-indicator ${getStatusClass(reminder.status)}`}></div>
-              
+
               <div className="minimal-card-header">
                 <div className={`reminder-type-icon ${reminder.type}`}>
                   <i className={reminder.icon}></i>
@@ -166,7 +166,7 @@ const Reminders = () => {
                   <p className="reminder-minimal-desc">{reminder.description}</p>
                 </div>
               </div>
-              
+
               <div className="reminder-minimal-meta">
                 <div className="reminder-minimal-time">
                   <i className="far fa-clock"></i>
@@ -176,15 +176,15 @@ const Reminders = () => {
                   {reminder.priority}
                 </span>
               </div>
-              
+
               <div className="minimal-card-actions">
-                <button 
+                <button
                   className="minimal-action-btn"
                   onClick={() => handleSnooze(reminder.id)}
                 >
                   <i className="fas fa-clock"></i> Snooze
                 </button>
-                <button 
+                <button
                   className="minimal-action-btn primary"
                   onClick={() => handleDismiss(reminder.id)}
                 >
@@ -200,8 +200,8 @@ const Reminders = () => {
             </div>
             <h3 className="minimal-empty-title">No Reminders Found</h3>
             <p className="minimal-empty-text">
-              {activeFilter === 'all' 
-                ? "You don't have any reminders yet. Add your first reminder to get started." 
+              {activeFilter === 'all'
+                ? "You don't have any reminders yet. Add your first reminder to get started."
                 : `No ${activeFilter} reminders found. Try a different filter.`}
             </p>
             <button className="minimal-empty-btn" onClick={handleAddReminder}>
@@ -210,7 +210,7 @@ const Reminders = () => {
           </div>
         )}
       </div>
-      
+
       {/* Stats Section */}
       <div className="reminders-minimal-stats">
         <div className="minimal-stats-header">
@@ -220,12 +220,11 @@ const Reminders = () => {
           {stats.map(stat => (
             <div className="minimal-stat-item" key={stat.id}>
               <div className={`minimal-stat-icon ${stat.type}`}>
-                <i className={`fas fa-${
-                  stat.type === 'active' ? 'bell' : 
-                  stat.type === 'completed' ? 'check-circle' : 
-                  stat.type === 'snoozed' ? 'clock' : 
-                  'exclamation-triangle'
-                }`}></i>
+                <i className={`fas fa-${stat.type === 'active' ? 'bell' :
+                    stat.type === 'completed' ? 'check-circle' :
+                      stat.type === 'snoozed' ? 'clock' :
+                        'exclamation-triangle'
+                  }`}></i>
               </div>
               <div className="minimal-stat-value">{stat.value}</div>
               <div className="minimal-stat-label">{stat.label}</div>
@@ -233,7 +232,7 @@ const Reminders = () => {
           ))}
         </div>
       </div>
-      
+
       {/* Summary Section */}
       <div className="reminders-minimal-summary">
         <div className="minimal-summary-header">
@@ -263,7 +262,7 @@ const Reminders = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="minimal-summary-card">
             <div className="summary-card-header">
               <i className="fas fa-calendar-alt"></i>
@@ -286,7 +285,7 @@ const Reminders = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="minimal-summary-card">
             <div className="summary-card-header">
               <i className="fas fa-heartbeat"></i>
@@ -311,7 +310,7 @@ const Reminders = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Floating Add Button */}
       <button className="minimal-add-btn" onClick={handleAddReminder}>
         <i className="fas fa-plus"></i>

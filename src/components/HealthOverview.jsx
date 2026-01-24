@@ -1,23 +1,23 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import NavHeader from './NavHeader';
-import './HealthOverview.css';
+
 
 const HealthOverview = () => {
   return (
     <div className="health-overview-container">
-      <NavHeader 
-        title="Health Overview" 
-        icon="fas fa-heartbeat" 
+      <NavHeader
+        title="Health Overview"
+        icon="fas fa-heartbeat"
         backLink="/"
       />
-      
+
       <div className="content-section">
         <div className="section-header">
           <h2>Current Vital Statistics</h2>
           <p>Real-time monitoring of your key health metrics</p>
         </div>
-        
+
         <div className="metrics-grid">
           {/* Heart Rate Card */}
           <div className="metric-card">
@@ -33,7 +33,7 @@ const HealthOverview = () => {
               <i className="fas fa-info-circle"></i> Within normal range (60-100 bpm)
             </div>
           </div>
-          
+
           {/* Blood Pressure Card */}
           <div className="metric-card highlight">
             <div className="metric-header">
@@ -48,7 +48,7 @@ const HealthOverview = () => {
               <i className="fas fa-info-circle"></i> Optimal blood pressure
             </div>
           </div>
-          
+
           {/* Blood Glucose Card */}
           <div className="metric-card">
             <div className="metric-header">
@@ -64,12 +64,12 @@ const HealthOverview = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="section-header">
           <h2>Recent History</h2>
           <p>Track your health metrics over the past week</p>
         </div>
-        
+
         <table className="history-table">
           <thead>
             <tr>
