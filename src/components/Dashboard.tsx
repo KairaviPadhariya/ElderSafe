@@ -11,8 +11,11 @@ import {
 } from 'lucide-react';
 import QuickStats from './QuickStats';
 import SOSButton from './SOSButton';
+import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
+  const navigate = useNavigate();
+
   const featureCards = [
     {
       id: 'health-entry',
@@ -21,6 +24,7 @@ function Dashboard() {
       icon: Plus,
       color: 'bg-blue-500',
       stats: 'Last entry: 2 hours ago',
+      path: '/daily-logs'
     },
     {
       id: 'health-tracker',
@@ -29,6 +33,7 @@ function Dashboard() {
       icon: TrendingUp,
       color: 'bg-emerald-500',
       stats: 'All vitals normal',
+      path: '/health-trends'
     },
     {
       id: 'appointments',
@@ -37,6 +42,7 @@ function Dashboard() {
       icon: Calendar,
       color: 'bg-violet-500',
       stats: 'Next: Tomorrow, 10:00 AM',
+      path: '/appointments'
     },
     {
       id: 'doctors',
@@ -45,6 +51,7 @@ function Dashboard() {
       icon: Stethoscope,
       color: 'bg-cyan-500',
       stats: '3 doctors',
+      path: '/doctors'
     },
     {
       id: 'medications',
@@ -53,6 +60,7 @@ function Dashboard() {
       icon: Pill,
       color: 'bg-orange-500',
       stats: '5 active prescriptions',
+      path: '/medications'
     },
     {
       id: 'medical-history',
@@ -61,6 +69,7 @@ function Dashboard() {
       icon: FileText,
       color: 'bg-pink-500',
       stats: 'Last updated: 1 week ago',
+      path: '/medical-history'
     },
   ];
 
@@ -92,6 +101,7 @@ function Dashboard() {
           return (
             <button
               key={card.id}
+              onClick={() => navigate(card.path)}
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-xl hover:shadow-slate-200/60 dark:hover:shadow-slate-900/50 border border-slate-100 dark:border-slate-700 p-8 transition-all duration-300 hover:-translate-y-1 text-left group relative overflow-hidden"
             >
               <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity`}>

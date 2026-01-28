@@ -8,6 +8,12 @@ import ProfilePanel from './components/ProfilePanel';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import MedicalDetails from './pages/MedicalDetails';
+import Appointments from './pages/Appointments';
+import DailyLogs from './pages/DailyLogs';
+import HealthTrends from './pages/HealthTrends';
+import Doctors from './pages/Doctors';
+import Medications from './pages/Medications';
+import MedicalHistory from './pages/MedicalHistory';
 
 function DashboardLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -43,6 +49,12 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/medical-details" element={<MedicalDetails />} />
+          <Route path="/appointments" element={<Appointments />} />
+          <Route path="/daily-logs" element={<DailyLogs />} />
+          <Route path="/health-trends" element={<HealthTrends />} />
+          <Route path="/doctors" element={<Doctors />} />
+          <Route path="/medications" element={<Medications />} />
+          <Route path="/medical-history" element={<MedicalHistory />} />
           <Route path="/" element={<DashboardLayout />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

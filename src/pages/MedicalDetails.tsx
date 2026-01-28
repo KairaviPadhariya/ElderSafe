@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Heart, Scale, Thermometer, User, Save, Clipboard } from 'lucide-react';
 
@@ -8,8 +8,10 @@ function MedicalDetails() {
     const [formData, setFormData] = useState({
         age: '',
         gender: '',
+        height: '',
         weight: '',
         bmi: '',
+        bloodGroup: '',
         o2Saturation: '',
         heartRate: '',
         sbp: '120',
@@ -23,6 +25,21 @@ function MedicalDetails() {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
+
+    // Calculate BMI whenever height or weight changes
+    useEffect(() => {
+        if (formData.height && formData.weight) {
+            const heightInMeters = parseFloat(formData.height) / 100;
+            const weightInKg = parseFloat(formData.weight);
+
+            if (heightInMeters > 0 && weightInKg > 0) {
+                const calculatedBmi = (weightInKg / (heightInMeters * heightInMeters)).toFixed(1);
+                setFormData(prev => ({ ...prev, bmi: calculatedBmi }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, bmi: '' }));
+        }
+    }, [formData.height, formData.weight]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,6 +105,44 @@ function MedicalDetails() {
                             </div>
 
                             <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Blood Group</label>
+                                <select
+                                    name="bloodGroup"
+                                    required
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    value={formData.bloodGroup}
+                                    onChange={handleChange}
+                                >
+                                    <option value="">Select Group</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Height (cm)</label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        name="height"
+                                        step="0.1"
+                                        required
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        placeholder="175"
+                                        value={formData.height}
+                                        onChange={handleChange}
+                                    />
+                                    <Scale className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Weight (kg)</label>
                                 <div className="relative">
                                     <input
@@ -115,14 +170,12 @@ function MedicalDetails() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">BMI</label>
                                 <input
-                                    type="number"
+                                    type="text"
                                     name="bmi"
-                                    step="0.1"
-                                    required
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
-                                    placeholder="22.5"
+                                    readOnly
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed outline-none"
+                                    placeholder="Calculated automatically"
                                     value={formData.bmi}
-                                    onChange={handleChange}
                                 />
                             </div>
 
