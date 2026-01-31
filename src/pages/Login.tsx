@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 function Login() {
     const [loading, setLoading] = useState(false);
+    const [role, setRole] = useState('patient'); // Default role
     const navigate = useNavigate();
 
     const handleLogin = (e: React.FormEvent) => {
@@ -13,10 +14,7 @@ function Login() {
         setTimeout(() => {
             setLoading(false);
             localStorage.setItem('isAuthenticated', 'true');
-            // Default role if not set (or could fetch from API)
-            if (!localStorage.getItem('userRole')) {
-                localStorage.setItem('userRole', 'patient');
-            }
+            localStorage.setItem('userRole', role); // Use selected role
             navigate('/');
         }, 1500);
     };
@@ -37,6 +35,25 @@ function Login() {
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
+                        {/* Role Selector for Demo/Testing */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Login as</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {['Patient', 'Doctor', 'Family'].map((r) => (
+                                    <button
+                                        key={r}
+                                        type="button"
+                                        onClick={() => setRole(r.toLowerCase())}
+                                        className={`py-2 px-1 rounded-xl text-xs sm:text-sm font-medium border transition-all ${role === r.toLowerCase()
+                                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-400'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 dark:bg-slate-900/50 dark:border-slate-700 dark:text-slate-400'
+                                            }`}
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
                             <div className="relative">
