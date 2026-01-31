@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Activity, Heart, Thermometer, Droplets } from 'lucide-react';
+import { Save, Activity, Heart, Droplets } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 function DailyLogs() {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ function DailyLogs() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-2xl mx-auto">
+                <BackButton />
                 <div className="mb-8">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Daily Health Log</h1>
                     <p className="text-slate-500 dark:text-slate-400">Record your vitals for today</p>

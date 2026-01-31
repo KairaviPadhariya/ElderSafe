@@ -12,6 +12,11 @@ function Login() {
         // Mock login delay
         setTimeout(() => {
             setLoading(false);
+            localStorage.setItem('isAuthenticated', 'true');
+            // Default role if not set (or could fetch from API)
+            if (!localStorage.getItem('userRole')) {
+                localStorage.setItem('userRole', 'patient');
+            }
             navigate('/');
         }, 1500);
     };

@@ -1,35 +1,35 @@
-import { Calendar, Clock, MapPin, Plus, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, MapPin, Plus } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 function Appointments() {
-    const navigate = useNavigate();
 
     const appointments = [
         {
             id: 1,
-            doctor: 'Dr. Sarvam Mehta',
+            doctor: 'Dr. Arun Kumar',
             specialty: 'Cardiologist',
             date: 'Tomorrow, Jan 29',
             time: '10:00 AM',
             location: 'Heart Care Center, Suite 302',
             status: 'upcoming',
-            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
+            image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
         },
         {
             id: 2,
-            doctor: 'Dr. Janvi Patel',
+            doctor: 'Dr. Anjali Singh',
             specialty: 'General Practitioner',
             date: 'Feb 15, 2024',
             time: '2:30 PM',
             location: 'City Medical Plaza',
             status: 'upcoming',
-            image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
+            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
         }
     ];
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
+                <BackButton />
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">My Appointments</h1>
@@ -86,12 +86,7 @@ function Appointments() {
                 </div>
 
                 <div className="mt-8 text-center">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 font-medium transition-colors"
-                    >
-                        Back to Dashboard
-                    </button>
+                    {/* Back button moved to top */}
                 </div>
             </div>
         </div>

@@ -13,6 +13,8 @@ function Register() {
         // Mock register delay
         setTimeout(() => {
             setLoading(false);
+            localStorage.setItem('userRole', role);
+            localStorage.setItem('isAuthenticated', 'true');
             if (role === 'patient') {
                 navigate('/medical-details');
             } else {
@@ -46,8 +48,8 @@ function Register() {
                                         type="button"
                                         onClick={() => setRole(r.toLowerCase())}
                                         className={`py-2 px-1 rounded-xl text-sm font-medium border transition-all ${role === r.toLowerCase()
-                                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-400'
-                                                : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 dark:bg-slate-900/50 dark:border-slate-700 dark:text-slate-400'
+                                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-400'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 dark:bg-slate-900/50 dark:border-slate-700 dark:text-slate-400'
                                             }`}
                                     >
                                         {r}

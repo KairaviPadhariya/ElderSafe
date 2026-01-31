@@ -1,23 +1,70 @@
-import { X, User, Mail, Phone, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, AlertCircle, LogOut } from 'lucide-react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface ProfilePanelProps {
   isOpen: boolean;
   onClose: () => void;
+  role: string;
 }
 
-function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
-  const patientInfo = {
-    name: 'Margaret Smith',
-    age: 72,
-    email: 'margaret.smith@email.com',
-    phone: '+1 (555) 123-4567',
-    address: '123 Oak Street, Springfield, IL 62701',
-    bloodType: 'O+',
-    emergencyContact: {
-      name: 'John Smith (Son)',
-      phone: '+1 (555) 987-6543',
-    },
+function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    onClose();
+    navigate('/login');
   };
+
+  const profileInfo = useMemo(() => {
+    switch (role) {
+      case 'doctor':
+        return {
+          name: 'Dr. Arun Kumar',
+          role: 'Cardiologist',
+          email: 'arun.kumar@hospital.com',
+          phone: '+1 (555) 999-8888',
+          address: 'General Hospital, Cardiology Dept, Room 304',
+          details: {
+            'License No': 'MD-12345-CA',
+            'Experience': '15 Years',
+            'Hospital': 'City General Hospital',
+          },
+          emergencyContact: null
+        };
+      case 'family':
+        return {
+          name: 'Rajesh Kumar',
+          role: 'Family Member (Son)',
+          email: 'rajesh.k@email.com',
+          phone: '+1 (555) 234-5678',
+          address: '456 Pine Street, Springfield, IL 62702',
+          details: {
+            'Relation': 'Son',
+            'Monitoring': 'Savitri Devi',
+            'Access Level': 'Full Access',
+          },
+          emergencyContact: null
+        };
+      default: // patient
+        return {
+          name: 'Savitri Devi',
+          role: 'Patient',
+          email: 'savitri.devi@email.com',
+          phone: '+1 (555) 123-4567',
+          address: '123 Oak Street, Springfield, IL 62701',
+          details: {
+            'Blood Type': 'O+',
+            'DOB': '1952-05-15',
+          },
+          emergencyContact: {
+            name: 'Rahul Sharma (Son)',
+            phone: '+1 (555) 987-6543',
+          }
+        };
+    }
+  }, [role]);
 
   if (!isOpen) return null;
 
@@ -49,9 +96,9 @@ function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
                 <User className="w-12 h-12 text-emerald-600" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900">
-                {patientInfo.name}
+                {profileInfo.name}
               </h3>
-              <p className="text-gray-600">{patientInfo.age} years old</p>
+              <p className="text-gray-600 font-medium">{profileInfo.role}</p>
             </div>
 
             <div className="space-y-4">
@@ -62,52 +109,65 @@ function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Mail className="w-5 h-5 text-gray-500" />
-                    <span className="text-gray-700">{patientInfo.email}</span>
+                    <span className="text-gray-700">{profileInfo.email}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-gray-500" />
-                    <span className="text-gray-700">{patientInfo.phone}</span>
+                    <span className="text-gray-700">{profileInfo.phone}</span>
                   </div>
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-gray-500 mt-1" />
-                    <span className="text-gray-700">{patientInfo.address}</span>
+                    <span className="text-gray-700">{profileInfo.address}</span>
                   </div>
                 </div>
               </div>
 
               <div className="bg-gray-50 rounded-xl p-4">
                 <h4 className="font-semibold text-gray-900 mb-3">
-                  Medical Information
-                </h4>
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-gray-500" />
-                  <span className="text-gray-700">
-                    Blood Type: {patientInfo.bloodType}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-                <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5" />
-                  Emergency Contact
+                  {role === 'doctor' ? 'Professional Details' : 'Other Details'}
                 </h4>
                 <div className="space-y-2">
-                  <p className="text-gray-700 font-medium">
-                    {patientInfo.emergencyContact.name}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Phone className="w-5 h-5 text-gray-500" />
-                    <span className="text-gray-700">
-                      {patientInfo.emergencyContact.phone}
-                    </span>
-                  </div>
+                  {Object.entries(profileInfo.details).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <span className="text-gray-500 w-24">{key}:</span>
+                      <span className="text-gray-700 font-medium">{value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                Edit Profile
-              </button>
+              {profileInfo.emergencyContact && (
+                <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                  <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Emergency Contact
+                  </h4>
+                  <div className="space-y-2">
+                    <p className="text-gray-700 font-medium">
+                      {profileInfo.emergencyContact.name}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-5 h-5 text-gray-500" />
+                      <span className="text-gray-700">
+                        {profileInfo.emergencyContact.phone}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3 pt-4">
+                <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                  Edit Profile
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sign Out
+                </button>
+              </div>
             </div>
           </div>
         </div>

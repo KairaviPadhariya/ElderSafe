@@ -1,19 +1,13 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText } from 'lucide-react';
+
+import { FileText } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 function MedicalHistory() {
-    const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center text-slate-500 hover:text-emerald-600 transition-colors mb-6"
-                >
-                    <ArrowLeft className="w-5 h-5 mr-2" />
-                    Back to Dashboard
-                </button>
+                <BackButton />
 
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
