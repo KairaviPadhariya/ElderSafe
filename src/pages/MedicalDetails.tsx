@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Heart, Scale, Thermometer, User, Save, Clipboard } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 function MedicalDetails() {
     const navigate = useNavigate();
@@ -54,6 +55,7 @@ function MedicalDetails() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
+                <BackButton />
                 <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-700">
                     <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-10 text-center">
                         <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm shadow-lg">

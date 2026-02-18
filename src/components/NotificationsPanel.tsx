@@ -1,43 +1,116 @@
-import { X, Bell, Calendar, Pill, AlertCircle } from 'lucide-react';
+import { X, Bell, Calendar, Pill, AlertCircle, User, FileText } from 'lucide-react';
+import { useMemo } from 'react';
 
 interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  role: string;
 }
 
-function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
-  const notifications = [
-    {
-      id: 1,
-      type: 'appointment',
-      icon: Calendar,
-      title: 'Upcoming Appointment',
-      message: 'Cardiology appointment tomorrow at 10:00 AM',
-      time: '1 hour ago',
-      color: 'text-violet-600',
-      bgColor: 'bg-violet-50',
-    },
-    {
-      id: 2,
-      type: 'medication',
-      icon: Pill,
-      title: 'Medication Reminder',
-      message: 'Time to take your evening medication',
-      time: '2 hours ago',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-    },
-    {
-      id: 3,
-      type: 'alert',
-      icon: AlertCircle,
-      title: 'Health Alert',
-      message: 'Your blood pressure reading was slightly elevated',
-      time: '5 hours ago',
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-    },
-  ];
+function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) {
+  const notifications = useMemo(() => {
+    switch (role) {
+      case 'doctor':
+        return [
+          {
+            id: 1,
+            type: 'alert',
+            icon: AlertCircle,
+            title: 'Critical Patient Alert',
+            message: 'Patient Savitri Devi reported high BP (180/100)',
+            time: '10 mins ago',
+            color: 'text-rose-600',
+            bgColor: 'bg-rose-50',
+          },
+          {
+            id: 2,
+            type: 'appointment',
+            icon: Calendar,
+            title: 'New Appointment',
+            message: 'Consultation with Rajesh Kumar confirmed',
+            time: '1 hour ago',
+            color: 'text-blue-600',
+            bgColor: 'bg-blue-50',
+          },
+          {
+            id: 3,
+            type: 'report',
+            icon: FileText,
+            title: 'Lab Results Ready',
+            message: 'Blood work results for John Doe are available',
+            time: '2 hours ago',
+            color: 'text-violet-600',
+            bgColor: 'bg-violet-50',
+          },
+        ];
+      case 'family':
+        return [
+          {
+            id: 1,
+            type: 'alert',
+            icon: AlertCircle,
+            title: 'Emergency Alert Test',
+            message: 'Savitri triggered an SOS test.',
+            time: '30 mins ago',
+            color: 'text-orange-600',
+            bgColor: 'bg-orange-50',
+          },
+          {
+            id: 2,
+            type: 'medication',
+            icon: Pill,
+            title: 'Medication Missed',
+            message: 'Savitri missed her morning dose.',
+            time: '4 hours ago',
+            color: 'text-rose-600',
+            bgColor: 'bg-rose-50',
+          },
+          {
+            id: 3,
+            type: 'info',
+            icon: User,
+            title: 'Carer Update',
+            message: 'Nurse visited at 10:00 AM.',
+            time: '5 hours ago',
+            color: 'text-emerald-600',
+            bgColor: 'bg-emerald-50',
+          },
+        ];
+      default: // patient
+        return [
+          {
+            id: 1,
+            type: 'appointment',
+            icon: Calendar,
+            title: 'Upcoming Appointment',
+            message: 'Cardiology appointment tomorrow at 10:00 AM',
+            time: '1 hour ago',
+            color: 'text-violet-600',
+            bgColor: 'bg-violet-50',
+          },
+          {
+            id: 2,
+            type: 'medication',
+            icon: Pill,
+            title: 'Medication Reminder',
+            message: 'Time to take your evening medication',
+            time: '2 hours ago',
+            color: 'text-orange-600',
+            bgColor: 'bg-orange-50',
+          },
+          {
+            id: 3,
+            type: 'alert',
+            icon: AlertCircle,
+            title: 'Health Alert',
+            message: 'Your blood pressure reading was slightly elevated',
+            time: '5 hours ago',
+            color: 'text-amber-600',
+            bgColor: 'bg-amber-50',
+          },
+        ];
+    }
+  }, [role]);
 
   if (!isOpen) return null;
 

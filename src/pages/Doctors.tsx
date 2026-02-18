@@ -1,35 +1,35 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Stethoscope, Phone, Mail, MapPin } from 'lucide-react';
+
+import { Stethoscope, Phone, Mail } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 function Doctors() {
-    const navigate = useNavigate();
 
     const doctors = [
         {
             id: 1,
-            name: 'Dr. Sarvam Mehta',
+            name: 'Dr. Arun Kumar',
             specialty: 'Cardiologist',
             hospital: 'Heart Care Center',
             phone: '+1 (555) 123-4567',
-            email: 'dr.sarvam@heartcare.com',
-            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
-        },
-        {
-            id: 2,
-            name: 'Dr. Janvi Patel',
-            specialty: 'General Practitioner',
-            hospital: 'City Medical Plaza',
-            phone: '+1 (555) 987-6543',
-            email: 'dr.janvi@citymed.com',
+            email: 'dr.arunk@heartcare.com',
             image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
         },
         {
+            id: 2,
+            name: 'Dr. Anjali Singh',
+            specialty: 'General Practitioner',
+            hospital: 'City Medical Plaza',
+            phone: '+1 (555) 987-6543',
+            email: 'dr.anjali@citymed.com',
+            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
+        },
+        {
             id: 3,
-            name: 'Dr.Sanjeev Kapoor',
+            name: 'Dr. Ravi Verma',
             specialty: 'Endocrinologist',
             hospital: 'General Hospital',
             phone: '+1 (555) 456-7890',
-            email: 'dr.sanjeev34@hospital.com',
+            email: 'dr.ravi@hospital.com',
             image: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&q=80&w=300&h=300'
         }
     ];
@@ -37,13 +37,7 @@ function Doctors() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
             <div className="max-w-5xl mx-auto">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center text-slate-500 hover:text-emerald-600 transition-colors mb-6"
-                >
-                    <ArrowLeft className="w-5 h-5 mr-2" />
-                    Back to Dashboard
-                </button>
+                <BackButton />
 
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
