@@ -12,13 +12,13 @@ function Register() {
         setLoading(true);
         // Mock register delay
         setTimeout(() => {
-            setLoading(false);
             localStorage.setItem('userRole', role);
             localStorage.setItem('isAuthenticated', 'true');
+            setLoading(false);
             if (role === 'patient') {
                 navigate('/medical-details');
             } else {
-                navigate('/');
+                navigate('/dashboard');
             }
         }, 1500);
     };

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
@@ -22,6 +23,7 @@ function DashboardLayout() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
       <Header
+        role="patient"
         onNotificationsClick={() => setShowNotifications(true)}
         onProfileClick={() => setShowProfile(true)}
       />
@@ -29,11 +31,13 @@ function DashboardLayout() {
       <Dashboard />
 
       <NotificationsPanel
+        role="patient"
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
 
       <ProfilePanel
+        role="patient"
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
       />

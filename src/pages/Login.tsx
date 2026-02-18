@@ -12,11 +12,10 @@ function Login() {
         setLoading(true);
         // Mock login delay
         setTimeout(() => {
-            setLoading(false);
-            navigate('/dashboard');
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('userRole', role); // Use selected role
-            navigate('/');
+            setLoading(false);
+            navigate('/dashboard');
         }, 1500);
     };
 
