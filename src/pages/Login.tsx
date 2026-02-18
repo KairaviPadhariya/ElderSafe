@@ -12,7 +12,7 @@ function Login() {
         // Mock login delay
         setTimeout(() => {
             setLoading(false);
-            navigate('/');
+            navigate('/dashboard');
         }, 1500);
     };
 
