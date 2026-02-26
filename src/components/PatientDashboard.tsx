@@ -83,6 +83,12 @@ function PatientDashboard() {
 
       <QuickStats />
 
+      {/* upcoming appointment info */}
+      <div className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Next Appointment</h3>
+        <p className="text-slate-700 dark:text-slate-300">Tomorrow, 10:00 AM with Dr. Arun Kumar</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
         {featureCards.map((card) => {
           const Icon = card.icon;

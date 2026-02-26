@@ -7,29 +7,33 @@ import {
 import { useState } from 'react';
 
 function DoctorDashboard() {
+    // include date for each appointment to demonstrate "today" filtering
+    const todayString = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const [appointments, setAppointments] = useState([
-        { id: 1, name: 'Janvi Patel', details: 'Routine Checkup', time: '10:00 AM', initials: 'JP' },
-        { id: 2, name: 'Robert Fox', details: 'Blood Pressure Check', time: '11:30 AM', initials: 'RF' },
-        { id: 3, name: 'Esther Howard', details: 'Consultation', time: '02:00 PM', initials: 'EH' },
+        { id: 1, name: 'Janvi Patel', details: 'Routine Checkup', reason: 'Regular check-up', time: '10:00 AM', initials: 'JP', date: todayString },
+        { id: 2, name: 'Robert Fox', details: 'Blood Pressure Check', reason: 'Hypertension follow-up', time: '11:30 AM', initials: 'RF', date: todayString },
+        { id: 3, name: 'Esther Howard', details: 'Consultation', reason: 'Discuss lab results', time: '02:00 PM', initials: 'EH', date: todayString },
+        // older appointment example will be filtered out
+        { id: 4, name: 'Old Patient', details: 'Follow-up', reason: 'Prescription refill', time: '09:00 AM', initials: 'OP', date: '2000-01-01' },
     ]);
 
     const [isAdding, setIsAdding] = useState(false);
-    const [newAppointment, setNewAppointment] = useState({ name: '', details: '', time: '' });
+    const [newAppointment, setNewAppointment] = useState({ name: '', details: '', reason: '', time: '' });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editTime, setEditTime] = useState('');
+    // state to show appointment details modal
+    const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
 
     const stats = [
         { title: 'Total Patients', value: '23', icon: Users, color: 'bg-blue-500' },
-        { title: 'Appointments Today', value: '3', icon: Calendar, color: 'bg-emerald-500' },
-        { title: 'Medical Records', value: '42', icon: FileText, color: 'bg-purple-500' },
-        { title: 'Messages', value: '5', icon: MessageSquare, color: 'bg-orange-500' },
+        { title: 'Appointments Today', value: appointments.filter(app => app.date === todayString).length.toString(), icon: Calendar, color: 'bg-emerald-500' },
     ];
 
     const handleAddAppointment = () => {
         if (newAppointment.name && newAppointment.time) {
             const initials = newAppointment.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
             setAppointments([...appointments, { ...newAppointment, id: Date.now(), initials }]);
-            setNewAppointment({ name: '', details: '', time: '' });
+            setNewAppointment({ name: '', details: '', reason: '', time: '' });
             setIsAdding(false);
         }
     };
@@ -46,6 +50,7 @@ function DoctorDashboard() {
         setEditingId(appointment.id);
         setEditTime(appointment.time);
     };
+
 
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -76,14 +81,18 @@ function DoctorDashboard() {
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Appointments with Patients</h3>
-                    <button
-                        onClick={() => setIsAdding(!isAdding)}
-                        className="text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:underline"
-                    >
-                        {isAdding ? 'Cancel' : '+ Add Appointment'}
-                    </button>
+                <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                            Appointments for {todayString}
+                        </h3>
+                        <button
+                            onClick={() => setIsAdding(!isAdding)}
+                            className="text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:underline"
+                        >
+                            {isAdding ? 'Cancel' : '+ Add Appointment'}
+                        </button>
+                    </div>
                 </div>
 
                 {isAdding && (
@@ -121,7 +130,9 @@ function DoctorDashboard() {
                 )}
 
                 <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {appointments.map((appointment) => (
+                    {appointments
+                    .filter(app => app.date === todayString) // only today
+                    .map((appointment) => (
                         <div key={appointment.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold">
@@ -162,9 +173,12 @@ function DoctorDashboard() {
                                         >
                                             Reschedule
                                         </button>
-                                        <button className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/30">
-                                            View Details
-                                        </button>
+                                                                <button
+                                                onClick={() => setSelectedAppointment(appointment)}
+                                                className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                                            >
+                                                View Details
+                                            </button>
                                     </>
                                 )}
                             </div>
@@ -172,6 +186,25 @@ function DoctorDashboard() {
                     ))}
                 </div>
             </div>
+
+            {/* details modal */}
+            {selectedAppointment && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-11/12 max-w-lg shadow-lg relative">
+                        <button
+                            onClick={() => setSelectedAppointment(null)}
+                            className="absolute top-3 right-3 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                        >
+                            ✕
+                        </button>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Appointment Details</h3>
+                        <p className="text-slate-700 dark:text-slate-300 mb-2"><strong>Patient:</strong> {selectedAppointment.name}</p>
+                        <p className="text-slate-700 dark:text-slate-300 mb-2"><strong>Time:</strong> {selectedAppointment.time}</p>
+                        <p className="text-slate-700 dark:text-slate-300 mb-2"><strong>Details:</strong> {selectedAppointment.details}</p>
+                        <p className="text-slate-700 dark:text-slate-300 mb-2"><strong>Reason:</strong> {selectedAppointment.reason}</p>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

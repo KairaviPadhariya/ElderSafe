@@ -12,6 +12,7 @@ import Appointments from './pages/Appointments';
 import DailyLogs from './pages/DailyLogs';
 import HealthTrends from './pages/HealthTrends';
 import Doctors from './pages/Doctors';
+import Patients from './pages/Patients';
 import Medications from './pages/Medications';
 import MedicalHistory from './pages/MedicalHistory';
 import LandingPage from './pages/LandingPage';
@@ -19,11 +20,12 @@ import LandingPage from './pages/LandingPage';
 function DashboardLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const role = localStorage.getItem('userRole') || 'patient';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
       <Header
-        role="patient"
+        role={role}
         onNotificationsClick={() => setShowNotifications(true)}
         onProfileClick={() => setShowProfile(true)}
       />
@@ -31,13 +33,13 @@ function DashboardLayout() {
       <Dashboard />
 
       <NotificationsPanel
-        role="patient"
+        role={role}
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
 
       <ProfilePanel
-        role="patient"
+        role={role}
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
       />
@@ -61,6 +63,7 @@ function App() {
           <Route path="/daily-logs" element={<DailyLogs />} />
           <Route path="/health-trends" element={<HealthTrends />} />
           <Route path="/doctors" element={<Doctors />} />
+          {/* patients route only via protected layout */}
           <Route path="/medications" element={<Medications />} />
           <Route path="/medical-history" element={<MedicalHistory />} />
           <Route path="/dashboard" element={<DashboardLayout />} />
@@ -75,7 +78,7 @@ function App() {
               <Route path="/doctors" element={<Doctors />} />
               <Route path="/medications" element={<Medications />} />
               <Route path="/medical-history" element={<MedicalHistory />} />
-              <Route path="/patients" element={<PlaceholderPage />} />
+              <Route path="/patients" element={<Patients />} />
               <Route path="/reports" element={<PlaceholderPage />} />
             </Route>
           </Route>

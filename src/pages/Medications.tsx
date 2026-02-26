@@ -1,8 +1,10 @@
 
 import { Pill, Clock, CalendarCheck } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { useState } from 'react';
 
 function Medications() {
+    const [message, setMessage] = useState<{id: number; text: string} | null>(null);
 
     const medications = [
         {
@@ -33,6 +35,7 @@ function Medications() {
             doctor: 'Dr. Arun Kumar'
         }
     ];
+
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
@@ -69,9 +72,17 @@ function Medications() {
                                     </div>
                                 </div>
                             </div>
-                            <button className="w-full sm:w-auto px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors shadow-lg shadow-orange-500/20">
+                            <button
+                                onClick={() => {
+                                    setMessage({ id: med.id, text: `Refill requested successfully for ${med.name}` });
+                                }}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors shadow-lg shadow-orange-500/20"
+                            >
                                 Refill Request
                             </button>
+                            {message && message.id === med.id && (
+                                <p className="mt-2 text-sm text-emerald-600">{message.text}</p>
+                            )}
                         </div>
                     ))}
                 </div>

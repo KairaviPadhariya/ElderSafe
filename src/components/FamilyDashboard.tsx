@@ -47,7 +47,7 @@ function FamilyDashboard() {
                 </button>
             </div>
 
-            {/* Notifications Section - SOS & Daily Review */}
+            {/* Notifications Section - SOS & Emergency */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 {/* SOS Notification (Demo: Inactive normally, but styled to show capability) */}
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
@@ -60,18 +60,22 @@ function FamilyDashboard() {
                     </div>
                 </div>
 
-                {/* Daily Review Notification */}
-                <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-6 shadow-sm border border-amber-100 dark:border-amber-900/30 flex items-center justify-between cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors" onClick={() => navigate('/daily-logs')}>
-                    <div className="flex items-center gap-4">
-                        <div className="bg-amber-100 dark:bg-amber-900/30 p-3 rounded-full">
-                            <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900 dark:text-white">Daily Review Required</h3>
-                            <p className="text-amber-700 dark:text-amber-400 text-sm">Please review today's health logs.</p>
-                        </div>
+                {/* Emergency Card */}
+                <div className="bg-rose-50 dark:bg-rose-900/20 rounded-2xl p-6 border border-rose-100 dark:border-rose-900/30">
+                    <h3 className="font-bold text-rose-700 dark:text-rose-400 mb-2 flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5" /> Emergency
+                    </h3>
+                    <p className="text-rose-600/80 dark:text-rose-300/60 text-sm mb-4">
+                        Tap to call emergency contacts immediately.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button className="bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 py-2 px-3 rounded-xl text-sm font-semibold shadow-sm border border-rose-100 dark:border-rose-900 flex items-center justify-center gap-2">
+                            <Phone className="w-4 h-4" /> 102
+                        </button>
+                        <button className="bg-rose-600 text-white py-2 px-3 rounded-xl text-sm font-semibold shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+                            <Phone className="w-4 h-4" /> Rahul
+                        </button>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-amber-500" />
                 </div>
             </div>
 
@@ -190,23 +194,6 @@ function FamilyDashboard() {
                     </p>
                 </div>
 
-                {/* Emergency Card */}
-                <div className="bg-rose-50 dark:bg-rose-900/20 rounded-2xl p-6 border border-rose-100 dark:border-rose-900/30">
-                    <h3 className="font-bold text-rose-700 dark:text-rose-400 mb-2 flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5" /> Emergency
-                    </h3>
-                    <p className="text-rose-600/80 dark:text-rose-300/60 text-sm mb-4">
-                        Tap to call emergency contacts immediately.
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button className="bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 py-2 px-3 rounded-xl text-sm font-semibold shadow-sm border border-rose-100 dark:border-rose-900 flex items-center justify-center gap-2">
-                            <Phone className="w-4 h-4" /> 102
-                        </button>
-                        <button className="bg-rose-600 text-white py-2 px-3 rounded-xl text-sm font-semibold shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-                            <Phone className="w-4 h-4" /> Rahul
-                        </button>
-                    </div>
-                </div>
             </div>
         </main>
     );

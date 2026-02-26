@@ -15,23 +15,26 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
   const getNavLinks = () => {
     switch (role) {
       case 'doctor':
+        // Doctor-specific navigation items (simplified)
         return [
           { name: 'Dashboard', path: '/' },
-          { name: 'Patients', path: '/patients' }, // Placeholder path
+          { name: 'My Patients', path: '/patients' },
           { name: 'Appointments', path: '/appointments' },
-          { name: 'Reports', path: '/reports' }, // Placeholder path
         ];
       case 'family':
+        // Family-specific navigation: focus on caregiving and quick access
         return [
           { name: 'Dashboard', path: '/' },
-          { name: 'Patient Overview', path: '/medical-details' }, // Reuse medical details?
-          { name: 'Reports', path: '/reports' }, // Placeholder
+          { name: 'Patient Overview', path: '/medical-details' },
+          { name: 'Daily Logs', path: '/daily-logs' },
+          { name: 'Emergency Contacts', path: '/emergency-contacts' },
+          { name: 'Care Team', path: '/doctors' },
         ];
       default: // patient
         return [
           { name: 'Dashboard', path: '/' },
           { name: 'Medical Details', path: '/medical-details' },
-          { name: 'My Doctors', path: '/doctors' },
+          { name: 'My Appointments', path: '/appointments' },
         ];
     }
   };
