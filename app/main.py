@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.database import database
+from app.database import database, client
 
 app = FastAPI()
 
@@ -9,5 +9,8 @@ def health():
 
 @app.get("/db-test")
 async def db_test():
-    collections = await database.list_collection_names()
-    return {"connected": True, "collections": collections}
+    try:
+        collections = await database.list_collection_names()
+        return {"connected": True, "collections": collections}
+    except Exception as e:
+        return {"connected": False, "error": str(e)}
