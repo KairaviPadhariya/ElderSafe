@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from app.database import database, client
+from app.routes import users
 
 app = FastAPI()
+
+app.include_router(users.router) 
 
 @app.get("/health")
 def health():

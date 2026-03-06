@@ -9,6 +9,6 @@ if not MONGODB_URI:
     raise ValueError("MONGODB_URI not found in environment variables")
 
 client = AsyncIOMotorClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
-database = client["eldersafe"]
+database = client["ElderSafe"]
 
 __all__ = ["client", "database"]
