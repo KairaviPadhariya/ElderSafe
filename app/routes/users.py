@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from app.database import database
 from app.schemas.user import UserCreate
 from datetime import datetime
 from passlib.context import CryptContext
-from app.schemas.login import LoginRequest
 from app.utils.security import verify_password
 from app.utils.jwt_handler import create_access_token
+from app.utils.auth import verify_token
 from bson import ObjectId
 
 router = APIRouter()
@@ -13,6 +14,7 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+# -------- PASSWORD HASH --------
 def hash_password(password: str):
     return pwd_context.hash(password)
 
@@ -35,7 +37,8 @@ async def create_user(user: UserCreate):
 
 # ---------------- GET ALL USERS ----------------
 @router.get("/users")
-async def get_users():
+async def get_users(current_user: str = Depends(verify_token)):
+
     users = []
 
     async for user in database.users.find():
@@ -47,7 +50,7 @@ async def get_users():
 
 # ---------------- GET SINGLE USER ----------------
 @router.get("/users/{user_id}")
-async def get_user(user_id: str):
+async def get_user(user_id: str, current_user: str = Depends(verify_token)):
 
     try:
         user = await database.users.find_one({"_id": ObjectId(user_id)})
@@ -58,14 +61,17 @@ async def get_user(user_id: str):
         raise HTTPException(status_code=404, detail="User not found")
 
     user["_id"] = str(user["_id"])
+
     return user
 
 
 # ---------------- UPDATE USER ----------------
 @router.put("/users/{user_id}")
-async def update_user(user_id: str, user: UserCreate):
+async def update_user(user_id: str, user: UserCreate, current_user: str = Depends(verify_token)):
 
     user_dict = user.dict()
+
+    # hash password again
     user_dict["password"] = hash_password(user.password)
 
     result = await database.users.update_one(
@@ -81,7 +87,7 @@ async def update_user(user_id: str, user: UserCreate):
 
 # ---------------- DELETE USER ----------------
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: str):
+async def delete_user(user_id: str, current_user: str = Depends(verify_token)):
 
     result = await database.users.delete_one({"_id": ObjectId(user_id)})
 
@@ -93,19 +99,16 @@ async def delete_user(user_id: str):
 
 # ---------------- LOGIN ----------------
 @router.post("/login")
-async def login(user: LoginRequest):
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
-    db_user = await database.users.find_one({"email": user.email})
+    db_user = await database.users.find_one({"email": form_data.username})
 
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
     hashed_password = db_user.get("password")
 
-    if not hashed_password:
-        raise HTTPException(status_code=500, detail="Password missing in database")
-
-    if not verify_password(user.password, hashed_password):
+    if not verify_password(form_data.password, hashed_password):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     token = create_access_token({"user_id": str(db_user["_id"])})
