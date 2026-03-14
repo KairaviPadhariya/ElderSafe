@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, client
 from app.routes import (
     users,
@@ -18,9 +19,18 @@ from app.routes import (
     medical_documents
 )
 
-
 app = FastAPI()
 
+# ✅ CORS Middleware (IMPORTANT for React frontend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ Include all routers
 app.include_router(users.router)
 app.include_router(patients.router)
 app.include_router(doctors.router)
@@ -37,11 +47,12 @@ app.include_router(prescriptions.router)
 app.include_router(sos.router)
 app.include_router(medical_documents.router)
 
-
+# ✅ Health check API
 @app.get("/health")
 def health():
     return {"status": "Backend is running 🚀"}
 
+# ✅ Database connection test
 @app.get("/db-test")
 async def db_test():
     try:

@@ -1,5 +1,5 @@
 import { X, Bell, Calendar, Pill, AlertCircle, User, FileText } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 
 interface NotificationsPanelProps {
   isOpen: boolean;
@@ -7,110 +7,46 @@ interface NotificationsPanelProps {
   role: string;
 }
 
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  time: string;
+  type?: string;
+}
+
 function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) {
-  const notifications = useMemo(() => {
-    switch (role) {
-      case 'doctor':
-        return [
-          {
-            id: 1,
-            type: 'alert',
-            icon: AlertCircle,
-            title: 'Critical Patient Alert',
-            message: 'Patient Savitri Devi reported high BP (180/100)',
-            time: '10 mins ago',
-            color: 'text-rose-600',
-            bgColor: 'bg-rose-50',
-          },
-          {
-            id: 2,
-            type: 'appointment',
-            icon: Calendar,
-            title: 'New Appointment',
-            message: 'Consultation with Rajesh Kumar confirmed',
-            time: '1 hour ago',
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-50',
-          },
-          {
-            id: 3,
-            type: 'report',
-            icon: FileText,
-            title: 'Lab Results Ready',
-            message: 'Blood work results for John Doe are available',
-            time: '2 hours ago',
-            color: 'text-violet-600',
-            bgColor: 'bg-violet-50',
-          },
-        ];
-      case 'family':
-        return [
-          {
-            id: 1,
-            type: 'alert',
-            icon: AlertCircle,
-            title: 'Emergency Alert Test',
-            message: 'Savitri triggered an SOS test.',
-            time: '30 mins ago',
-            color: 'text-orange-600',
-            bgColor: 'bg-orange-50',
-          },
-          {
-            id: 2,
-            type: 'medication',
-            icon: Pill,
-            title: 'Medication Missed',
-            message: 'Savitri missed her morning dose.',
-            time: '4 hours ago',
-            color: 'text-rose-600',
-            bgColor: 'bg-rose-50',
-          },
-          {
-            id: 3,
-            type: 'info',
-            icon: User,
-            title: 'Carer Update',
-            message: 'Nurse visited at 10:00 AM.',
-            time: '5 hours ago',
-            color: 'text-emerald-600',
-            bgColor: 'bg-emerald-50',
-          },
-        ];
-      default: // patient
-        return [
-          {
-            id: 1,
-            type: 'appointment',
-            icon: Calendar,
-            title: 'Upcoming Appointment',
-            message: 'Cardiology appointment tomorrow at 10:00 AM',
-            time: '1 hour ago',
-            color: 'text-violet-600',
-            bgColor: 'bg-violet-50',
-          },
-          {
-            id: 2,
-            type: 'medication',
-            icon: Pill,
-            title: 'Medication Reminder',
-            message: 'Time to take your evening medication',
-            time: '2 hours ago',
-            color: 'text-orange-600',
-            bgColor: 'bg-orange-50',
-          },
-          {
-            id: 3,
-            type: 'alert',
-            icon: AlertCircle,
-            title: 'Health Alert',
-            message: 'Your blood pressure reading was slightly elevated',
-            time: '5 hours ago',
-            color: 'text-amber-600',
-            bgColor: 'bg-amber-50',
-          },
-        ];
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+
+    const fetchNotifications = async () => {
+
+      const token = localStorage.getItem("token");
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/notifications", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json();
+        setNotifications(data);
+
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+
+    };
+
+    if (isOpen) {
+      fetchNotifications();
     }
-  }, [role]);
+
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -123,11 +59,13 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
 
       <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform">
         <div className="h-full flex flex-col">
+
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <Bell className="w-6 h-6 text-gray-700" />
               <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
             </div>
+
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -138,34 +76,57 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
 
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-4">
+
+              {notifications.length === 0 && (
+                <p className="text-gray-500 text-center">
+                  No notifications available
+                </p>
+              )}
+
               {notifications.map((notification) => {
-                const Icon = notification.icon;
+
+                let Icon = Bell;
+
+                if (notification.type === "appointment") Icon = Calendar;
+                else if (notification.type === "medication") Icon = Pill;
+                else if (notification.type === "alert") Icon = AlertCircle;
+                else if (notification.type === "user") Icon = User;
+                else if (notification.type === "report") Icon = FileText;
+
                 return (
                   <div
                     key={notification.id}
                     className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                   >
                     <div className="flex gap-4">
-                      <div className={`${notification.bgColor} p-2 rounded-lg h-fit`}>
-                        <Icon className={`w-5 h-5 ${notification.color}`} />
+
+                      <div className="bg-gray-100 p-2 rounded-lg h-fit">
+                        <Icon className="w-5 h-5 text-gray-700" />
                       </div>
+
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 mb-1">
                           {notification.title}
                         </h3>
+
                         <p className="text-gray-600 text-sm mb-2">
                           {notification.message}
                         </p>
+
                         <span className="text-xs text-gray-500">
                           {notification.time}
                         </span>
                       </div>
+
                     </div>
                   </div>
                 );
+
               })}
+
             </div>
           </div>
+
         </div>
       </div>
     </>

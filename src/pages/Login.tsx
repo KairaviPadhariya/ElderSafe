@@ -1,22 +1,60 @@
 import { useState } from 'react';
-import { Heart, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Heart, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 function Login() {
     const [loading, setLoading] = useState(false);
-    const [role, setRole] = useState('patient'); // Default role
+    const [role, setRole] = useState('patient');
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [rememberMe, setRememberMe] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
     const navigate = useNavigate();
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
+        console.log("login function triggered");
         e.preventDefault();
         setLoading(true);
-        // Mock login delay
-        setTimeout(() => {
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('userRole', role); // Use selected role
-            setLoading(false);
-            navigate('/dashboard');
-        }, 1500);
+
+        try {
+            const response = await fetch("http://127.0.0.1:8000/login", {
+                method: "POST",
+                headers: {
+   "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({
+                  username: email,
+                password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.access_token) {
+
+                console.log("TOKEN RECEIVED",data.access_token);
+                localStorage.setItem("token", data.access_token);
+                localStorage.setItem("userRole", role);
+                localStorage.setItem("isAuthenticated", "true");
+
+                if (rememberMe) {
+                    localStorage.setItem("rememberEmail", email);
+                } else {
+                    localStorage.removeItem("rememberEmail");
+                }
+
+                navigate("/dashboard");
+            } else {
+                alert("Invalid email or password");
+            }
+
+        } catch (error) {
+            console.error("Login error:", error);
+            alert("Server error. Check backend.");
+        }
+
+        setLoading(false);
     };
 
     return (
@@ -35,7 +73,8 @@ function Login() {
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
-                        {/* Role Selector for Demo/Testing */}
+
+                        {/* Role Selector */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Login as</label>
                             <div className="grid grid-cols-3 gap-2">
@@ -54,6 +93,8 @@ function Login() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Email */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
                             <div className="relative">
@@ -62,6 +103,8 @@ function Login() {
                                 </div>
                                 <input
                                     type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="name@example.com"
                                     required
@@ -69,6 +112,7 @@ function Login() {
                             </div>
                         </div>
 
+                        {/* Password */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Password</label>
                             <div className="relative">
@@ -76,20 +120,44 @@ function Login() {
                                     <Lock className="h-5 w-5 text-slate-400" />
                                 </div>
                                 <input
-                                    type="password"
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="block w-full pl-11 pr-12 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="••••••••"
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                                    ) : (
+                                        <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                                    )}
+                                </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                            <label className="flex items-center text-slate-600 dark:text-slate-400 cursor-pointer">
-                                <input type="checkbox" className="mr-2 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                                Remember me
+                        {/* Remember Me and Forgot Password */}
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded"
+                                />
+                                <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">Remember me</span>
                             </label>
-                            <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-400">Forgot password?</a>
+                            <Link
+                                to="/forgot-password"
+                                className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium"
+                            >
+                                Forgot password?
+                            </Link>
                         </div>
 
                         <button
@@ -105,6 +173,7 @@ function Login() {
                                 </>
                             )}
                         </button>
+
                     </form>
 
                     <div className="mt-8 text-center">
@@ -115,6 +184,7 @@ function Login() {
                             </Link>
                         </p>
                     </div>
+
                 </div>
             </div>
         </div>
