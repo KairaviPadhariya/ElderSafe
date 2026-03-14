@@ -2,15 +2,28 @@ from fastapi import APIRouter
 from app.database import database
 from app.schemas.user import UserCreate
 from datetime import datetime
+from passlib.context import CryptContext
 
 router = APIRouter()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
 
 # Create User
 @router.post("/users")
 async def create_user(user: UserCreate):
+
     user_dict = user.dict()
+
+    # hash password
+    user_dict["password"] = hash_password(user.password)
+
     user_dict["created_at"] = datetime.utcnow()
+
     result = await database.users.insert_one(user_dict)
+
     return {"id": str(result.inserted_id)}
 
 # Get all Users
