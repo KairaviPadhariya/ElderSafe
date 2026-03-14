@@ -1,17 +1,30 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File, Depends
 from app.database import database
 from app.schemas.medical_document import MedicalDocumentCreate
 from datetime import datetime
+from app.utils.auth import verify_token
 
 router = APIRouter()
 
-@router.post("/medical_documents")
-async def create_document(doc: MedicalDocumentCreate):
-    doc_dict = doc.dict()
-    doc_dict["created_at"] = datetime.utcnow()
-    result = await database.medical_documents.insert_one(doc_dict)
-    return {"id": str(result.inserted_id)}
+router = APIRouter()
 
+@router.post("/medical-documents")
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(verify_token)
+):
+    file_data = await file.read()
+    document = {
+        "filename": file.filename,
+        "content": file_data,
+        "uploaded_by": current_user["user_id"],
+        "uploaded_at": datetime.utcnow()
+    }
+    result = await database.medical_documents.insert_one(document)
+    return {
+        "message": "Document uploaded",
+        "document_id": str(result.inserted_id)
+    }
 
 @router.get("/medical_documents")
 async def get_documents():

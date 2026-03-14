@@ -88,13 +88,17 @@ async def update_user(user_id: str, user: UserCreate, current_user: str = Depend
 # ---------------- DELETE USER ----------------
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: str = Depends(verify_token)):
-
+    # get logged-in user
+    logged_user = await database.users.find_one({"_id": ObjectId(current_user)})
+    if not logged_user:
+        raise HTTPException(status_code=404, detail="Logged user not found")
+    # role check
+    if logged_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can delete users")
     result = await database.users.delete_one({"_id": ObjectId(user_id)})
-
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-
-    return {"message": "User deleted"}
+    return {"message": "User deleted successfully"}
 
 
 # ---------------- LOGIN ----------------
@@ -111,7 +115,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not verify_password(form_data.password, hashed_password):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    token = create_access_token({"user_id": str(db_user["_id"])})
+    token = create_access_token({"user_id": str(db_user["_id"]),
+                                 "role": db_user["role"]})
 
     return {
         "access_token": token,
