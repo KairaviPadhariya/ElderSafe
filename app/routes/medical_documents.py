@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.utils.auth import verify_token
 from app.database import database
 from app.schemas.medical_document import MedicalDocumentCreate
 from datetime import datetime
@@ -14,7 +15,7 @@ async def create_document(doc: MedicalDocumentCreate):
 
 
 @router.get("/medical_documents")
-async def get_documents():
+async def get_medical_documents(current_user: str = Depends(verify_token)):
     documents = []
     async for doc in database.medical_documents.find():
         doc["_id"] = str(doc["_id"])

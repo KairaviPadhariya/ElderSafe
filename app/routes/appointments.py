@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.utils.auth import verify_token
 from app.database import database
 from app.schemas.appointment import AppointmentCreate
 from datetime import datetime
@@ -14,7 +15,7 @@ async def create_appointment(appointment: AppointmentCreate):
 
 
 @router.get("/appointments")
-async def get_appointments():
+async def get_appointments(current_user: str = Depends(verify_token)):
     appointments = []
     async for appointment in database.appointments.find():
         appointment["_id"] = str(appointment["_id"])
