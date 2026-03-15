@@ -15,37 +15,56 @@ interface Notification {
   type?: string;
 }
 
-function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) {
-
+function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-
     const fetchNotifications = async () => {
-
       const token = localStorage.getItem("token");
+      console.log("TOKEN:", token);
+
+      if (!token) {
+        setError("No token found. Please log in again.");
+        setNotifications([]);
+        return;
+      }
 
       try {
         const response = await fetch("http://127.0.0.1:8000/notifications", {
           method: "GET",
           headers: {
-            "Authorization": `Bearer ${token}`
-          }
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         });
 
+        if (response.status === 401) {
+          setError("Unauthorized. Token may be invalid or expired.");
+          setNotifications([]);
+          // Optionally redirect to login:
+          // window.location.href = "/login";
+          return;
+        }
+
+        if (!response.ok) {
+          setError(`Error: ${response.statusText}`);
+          setNotifications([]);
+          return;
+        }
+
         const data = await response.json();
-        setNotifications(data);
-
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
+        setNotifications(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+        setError("Failed to load notifications.");
+        setNotifications([]);
       }
-
     };
 
     if (isOpen) {
       fetchNotifications();
     }
-
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -59,7 +78,6 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
 
       <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform">
         <div className="h-full flex flex-col">
-
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <Bell className="w-6 h-6 text-gray-700" />
@@ -76,17 +94,18 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
 
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-4">
+              {error && (
+                <p className="text-red-500 text-center">{error}</p>
+              )}
 
-              {notifications.length === 0 && (
+              {notifications.length === 0 && !error && (
                 <p className="text-gray-500 text-center">
                   No notifications available
                 </p>
               )}
 
               {notifications.map((notification) => {
-
                 let Icon = Bell;
-
                 if (notification.type === "appointment") Icon = Calendar;
                 else if (notification.type === "medication") Icon = Pill;
                 else if (notification.type === "alert") Icon = AlertCircle;
@@ -99,34 +118,26 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
                     className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                   >
                     <div className="flex gap-4">
-
                       <div className="bg-gray-100 p-2 rounded-lg h-fit">
                         <Icon className="w-5 h-5 text-gray-700" />
                       </div>
-
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 mb-1">
                           {notification.title}
                         </h3>
-
                         <p className="text-gray-600 text-sm mb-2">
                           {notification.message}
                         </p>
-
                         <span className="text-xs text-gray-500">
                           {notification.time}
                         </span>
                       </div>
-
                     </div>
                   </div>
                 );
-
               })}
-
             </div>
           </div>
-
         </div>
       </div>
     </>

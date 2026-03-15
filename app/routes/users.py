@@ -117,7 +117,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     token = create_access_token({
-        "user_id": str(db_user["_id"]),
+        "sub": str(db_user["_id"]),
         "role": db_user["role"]
     })
 

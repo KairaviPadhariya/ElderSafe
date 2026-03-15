@@ -9,9 +9,10 @@ router = APIRouter()
 @router.post("/notifications")
 async def create_notification(
     notification: NotificationCreate,
-    current_user: str = Depends(verify_token)
+    current_user: dict = Depends(verify_token)
 ):
     notification_dict = notification.dict()
+    notification_dict["user_id"] = current_user["sub"]
     notification_dict["created_at"] = datetime.utcnow()
 
     result = await database.notifications.insert_one(notification_dict)
@@ -20,9 +21,10 @@ async def create_notification(
 
 
 @router.get("/notifications")
-async def get_notifications(current_user: str = Depends(verify_token)):
+async def get_notifications(current_user: dict = Depends(verify_token)):
+    user_id = current_user["user_id"]
     notifications = []
-    async for n in database.notifications.find():
+    async for n in database.notifications.find({"user_id": user_id}):
         n["_id"] = str(n["_id"])
         notifications.append(n)
     return notifications
