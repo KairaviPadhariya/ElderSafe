@@ -12,7 +12,7 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         # decode JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-        user_id: str = payload.get("user_id")
+        user_id: str = payload.get("sub")
         role: str = payload.get("role")
 
         if user_id is None:
