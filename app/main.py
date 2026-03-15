@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, client
 from app.routes import (
     users,
@@ -21,7 +22,30 @@ from app.routes import (
 
 app = FastAPI()
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(users.router)
+app.include_router(patients.router)
+app.include_router(doctors.router)
+app.include_router(appointments.router)
+app.include_router(medications.router)
+app.include_router(activity_logs.router)
+app.include_router(audit_logs.router)
+app.include_router(caregiver_access.router)
+app.include_router(daily_health_logs.router)
+app.include_router(health_trends.router)
+app.include_router(medical_history.router)
+app.include_router(notifications.router)
+app.include_router(prescriptions.router)
+app.include_router(sos.router)
+app.include_router(medical_documents.router)
 app.include_router(patients.router)
 app.include_router(doctors.router)
 app.include_router(appointments.router)

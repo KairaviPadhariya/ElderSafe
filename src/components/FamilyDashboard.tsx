@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-function FamilyDashboard() {
+interface Props {
+  userName: string;
+}
+
+function FamilyDashboard({ userName } : Props) {
     const navigate = useNavigate();
 
     // Mock data for the chart
@@ -33,8 +37,8 @@ function FamilyDashboard() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-                        Welcome, Rajesh
+                   <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
+                    Welcome, {userName}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-lg">Monitoring status for: <span className="font-semibold text-slate-900 dark:text-white">Savitri (Mother)</span></p>
                 </div>

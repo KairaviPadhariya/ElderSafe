@@ -18,7 +18,6 @@ async def create_notification(
 
     return {"notification_id": str(result.inserted_id)}
 
-
 @router.get("/notifications")
 async def get_notifications(current_user: str = Depends(verify_token)):
     notifications = []

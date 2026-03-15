@@ -12,7 +12,11 @@ import QuickStats from './QuickStats';
 import SOSButton from './SOSButton';
 import { useNavigate } from 'react-router-dom';
 
-function PatientDashboard() {
+interface Props {
+  userName: string;
+}
+
+function PatientDashboard({ userName }: Props) {
   const navigate = useNavigate();
 
   const featureCards = [
@@ -76,7 +80,7 @@ function PatientDashboard() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 transition-all duration-300">
       <div className="mb-10">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-          Welcome back, Savitri
+          Welcome back, {userName}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">Here's your health overview for today</p>
       </div>

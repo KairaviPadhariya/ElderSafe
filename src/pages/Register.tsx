@@ -1,26 +1,55 @@
 import { useState } from 'react';
 import { Heart, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../utils/api';
 
 function Register() {
     const [loading, setLoading] = useState(false);
     const [role, setRole] = useState('patient');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Mock register delay
-        setTimeout(() => {
-            localStorage.setItem('userRole', role);
-            localStorage.setItem('isAuthenticated', 'true');
+        setError('');
+
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
             setLoading(false);
-            if (role === 'patient') {
-                navigate('/medical-details');
-            } else {
-                navigate('/dashboard');
-            }
-        }, 1500);
+            return;
+        }
+
+        if (!name.trim()) {
+            setError('Name is required');
+            setLoading(false);
+            return;
+        }
+
+        if (!email.includes('@')) {
+            setError('Please enter a valid email address');
+            setLoading(false);
+            return;
+        }
+
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            await api.register({ name: name.trim(), email: email.trim(), password, role });
+            navigate('/login');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -66,6 +95,8 @@ function Register() {
                                 </div>
                                 <input
                                     type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="John Doe"
                                     required
@@ -81,6 +112,8 @@ function Register() {
                                 </div>
                                 <input
                                     type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="name@example.com"
                                     required
@@ -96,6 +129,8 @@ function Register() {
                                 </div>
                                 <input
                                     type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="••••••••"
                                     required
@@ -111,12 +146,20 @@ function Register() {
                                 </div>
                                 <input
                                     type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     placeholder="••••••••"
                                     required
                                 />
                             </div>
                         </div>
+
+                        {error && (
+                            <div className="text-red-500 text-sm text-center">
+                                {error}
+                            </div>
+                        )}
 
                         <button
                             type="submit"

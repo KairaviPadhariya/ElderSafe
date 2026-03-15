@@ -5,23 +5,30 @@ import FamilyDashboard from './FamilyDashboard';
 
 function Dashboard() {
   const [role, setRole] = useState('patient');
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     const savedRole = localStorage.getItem('userRole');
+    const savedName = localStorage.getItem('userName');
+
     if (savedRole) {
       setRole(savedRole);
+    }
+
+    if (savedName) {
+      setUserName(savedName);
     }
   }, []);
 
   if (role === 'doctor') {
-    return <DoctorDashboard />;
+    return <DoctorDashboard userName={userName} />;
   }
 
   if (role === 'family') {
-    return <FamilyDashboard />;
+    return <FamilyDashboard userName={userName} />;
   }
 
-  return <PatientDashboard />;
+  return <PatientDashboard userName={userName} />;
 }
 
 export default Dashboard;
