@@ -23,10 +23,12 @@ import PlaceholderPage from './pages/PlaceholderPage';
 function DashboardLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+
   const role = localStorage.getItem('userRole') || 'patient';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+
       <Header
         role={role}
         onNotificationsClick={() => setShowNotifications(true)}
@@ -46,6 +48,7 @@ function DashboardLayout() {
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
       />
+
     </div>
   );
 }
@@ -53,15 +56,23 @@ function DashboardLayout() {
 function App() {
   return (
     <ThemeProvider>
+
       <Router>
+
         <Routes>
+
+          {/* Public Pages */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<DashboardLayout />} />
 
+          {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+
+            <Route path="/dashboard" element={<DashboardLayout />} />
+
             <Route element={<MainLayout />}>
+
               <Route path="/medical-details" element={<MedicalDetails />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/daily-logs" element={<DailyLogs />} />
@@ -71,12 +82,18 @@ function App() {
               <Route path="/medical-history" element={<MedicalHistory />} />
               <Route path="/patients" element={<Patients />} />
               <Route path="/reports" element={<PlaceholderPage />} />
+
             </Route>
+
           </Route>
 
+          {/* Unknown Routes */}
           <Route path="*" element={<Navigate to="/" replace />} />
+
         </Routes>
+
       </Router>
+
     </ThemeProvider>
   );
 }

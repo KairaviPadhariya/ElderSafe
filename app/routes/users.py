@@ -101,10 +101,21 @@ async def delete_user(user_id: str, current_user: str = Depends(verify_token)):
     return {"message": "User deleted successfully"}
 
 
+# ---------------- GET CURRENT USER ----------------
+@router.get("/users/me")
+async def get_current_user(current_user: str = Depends(verify_token)):
+    user = await database.users.find_one({"_id": ObjectId(current_user)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user["_id"] = str(user["_id"])
+    return user
+
+
 # ---------------- LOGIN ----------------
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
+    # username field is used for email
     db_user = await database.users.find_one({"email": form_data.username})
 
     if not db_user:
@@ -115,8 +126,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not verify_password(form_data.password, hashed_password):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    token = create_access_token({"user_id": str(db_user["_id"]),
-                                 "role": db_user["role"]})
+    token = create_access_token({
+        "user_id": str(db_user["_id"]),
+        "role": db_user["role"]
+    })
 
     return {
         "access_token": token,
