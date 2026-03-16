@@ -4,8 +4,8 @@ import DoctorDashboard from './DoctorDashboard';
 import FamilyDashboard from './FamilyDashboard';
 
 function Dashboard() {
-  const [role, setRole] = useState('patient');
-  const [userName, setUserName] = useState('');
+  const [role, setRole] = useState<string>('patient');
+  const [userName, setUserName] = useState<string>('User');
 
   useEffect(() => {
     const savedRole = localStorage.getItem('userRole');

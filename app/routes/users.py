@@ -37,7 +37,7 @@ async def create_user(user: UserCreate):
 
 # ---------------- GET ALL USERS ----------------
 @router.get("/users")
-async def get_users(current_user: str = Depends(verify_token)):
+async def get_users(current_user: dict = Depends(verify_token)):
 
     users = []
 
@@ -50,7 +50,7 @@ async def get_users(current_user: str = Depends(verify_token)):
 
 # ---------------- GET SINGLE USER ----------------
 @router.get("/users/{user_id}")
-async def get_user(user_id: str, current_user: str = Depends(verify_token)):
+async def get_user(user_id: str, current_user: dict = Depends(verify_token)):
 
     try:
         user = await database.users.find_one({"_id": ObjectId(user_id)})
@@ -67,7 +67,7 @@ async def get_user(user_id: str, current_user: str = Depends(verify_token)):
 
 # ---------------- UPDATE USER ----------------
 @router.put("/users/{user_id}")
-async def update_user(user_id: str, user: UserCreate, current_user: str = Depends(verify_token)):
+async def update_user(user_id: str, user: UserCreate, current_user: dict = Depends(verify_token)):
 
     user_dict = user.dict()
 
@@ -87,29 +87,43 @@ async def update_user(user_id: str, user: UserCreate, current_user: str = Depend
 
 # ---------------- DELETE USER ----------------
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: str, current_user: str = Depends(verify_token)):
-    # get logged-in user
-    logged_user = await database.users.find_one({"_id": ObjectId(current_user)})
+async def delete_user(user_id: str, current_user: dict = Depends(verify_token)):
+
+    logged_user = await database.users.find_one({"_id": ObjectId(current_user["user_id"])})
+
     if not logged_user:
         raise HTTPException(status_code=404, detail="Logged user not found")
-    # role check
+
     if logged_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admin can delete users")
+
     result = await database.users.delete_one({"_id": ObjectId(user_id)})
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
+
     return {"message": "User deleted successfully"}
 
 
 # ---------------- GET CURRENT USER ----------------
 @router.get("/users/me")
-async def get_current_user(current_user: str = Depends(verify_token)):
-    user = await database.users.find_one({"_id": ObjectId(current_user)})
+async def get_current_user(current_user: dict = Depends(verify_token)):
+
+    try:
+        user_id = ObjectId(current_user["user_id"])
+    except:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    user = await database.users.find_one({"_id": user_id})
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user["_id"] = str(user["_id"])
-    return user
 
+    return {
+        "name": user["name"],
+        "email": user["email"],
+        "role": user["role"]
+    }
 
 # ---------------- LOGIN ----------------
 @router.post("/login")

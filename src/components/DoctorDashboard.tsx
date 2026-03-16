@@ -10,6 +10,8 @@ interface Props {
 
 function DoctorDashboard({ userName }: Props) {
 
+  const displayName = userName || "Doctor";
+
   const todayString = new Date().toISOString().slice(0, 10);
 
   const [appointments, setAppointments] = useState([
@@ -71,7 +73,7 @@ function DoctorDashboard({ userName }: Props) {
 
       <div className="mb-10">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-          Welcome back, Dr. {userName}
+          Welcome back, Dr. {displayName}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
           Here is your daily overview
