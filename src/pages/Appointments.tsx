@@ -1,71 +1,270 @@
 import { Calendar, Clock, MapPin, Plus, Edit2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
 import BackButton from '../components/BackButton';
-import { useState } from 'react';
 
-function Appointments() {
-    const [appointments, setAppointments] = useState([
-        {
-            id: 1,
-            doctor: 'Dr. Arun Kumar',
-            specialty: 'Cardiologist',
-            date: 'Tomorrow, Jan 29',
-            time: '10:00 AM',
-            location: 'Heart Care Center, Suite 302',
-            status: 'upcoming',
-            image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
-        },
-        {
-            id: 2,
-            doctor: 'Dr. Anjali Singh',
-            specialty: 'General Practitioner',
-            date: 'Feb 15, 2024',
-            time: '2:30 PM',
-            location: 'City Medical Plaza',
-            status: 'upcoming',
-            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
-        }
-    ]);
+const API_BASE_URL = 'http://127.0.0.1:8000';
+const REQUEST_TIMEOUT_MS = 12000;
+const placeholderImage = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300';
 
-    const [isAdding, setIsAdding] = useState(false);
-    const [isRescheduling, setIsRescheduling] = useState<number | null>(null);
-    const [newAppointment, setNewAppointment] = useState({
+type Appointment = {
+    _id?: string;
+    id?: string | number;
+    doctor_id?: string;
+    doctor_name?: string;
+    specialty?: string;
+    date: string;
+    time: string;
+    reason?: string;
+    location?: string;
+    status?: string;
+    image?: string;
+};
+
+type AppointmentFormState = {
+    doctor: string;
+    specialty: string;
+    date: string;
+    time: string;
+    location: string;
+};
+
+function getTodayDate() {
+    const now = new Date();
+    const offset = now.getTimezoneOffset();
+    const localDate = new Date(now.getTime() - offset * 60000);
+    return localDate.toISOString().split('T')[0];
+}
+
+function getCurrentTime() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function createEmptyFormState(): AppointmentFormState {
+    return {
         doctor: '',
         specialty: '',
         date: '',
         time: '',
         location: ''
-    });
-    const [rescheduleData, setRescheduleData] = useState({ date: '', time: '' });
+    };
+}
 
-    const handleAddAppointment = () => {
-        if (newAppointment.doctor && newAppointment.date && newAppointment.time) {
-            setAppointments([...appointments, {
-                id: Date.now(),
-                doctor: newAppointment.doctor,
-                specialty: newAppointment.specialty,
-                date: newAppointment.date,
-                time: newAppointment.time,
-                location: newAppointment.location,
-                status: 'upcoming',
-                image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
-            }]);
-            setNewAppointment({ doctor: '', specialty: '', date: '', time: '', location: '' });
+async function requestJson(url: string, options: RequestInit = {}) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+
+        if (!response.ok) {
+            throw new Error(data?.detail || data?.message || 'Request failed');
+        }
+
+        return data;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new Error('Request timed out. Please check that the backend and MongoDB are running.');
+        }
+
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function Appointments() {
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [isAdding, setIsAdding] = useState(false);
+    const [isRescheduling, setIsRescheduling] = useState<string | number | null>(null);
+    const [newAppointment, setNewAppointment] = useState<AppointmentFormState>(createEmptyFormState());
+    const [rescheduleData, setRescheduleData] = useState({ date: '', time: '' });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [updatingId, setUpdatingId] = useState<string | number | null>(null);
+    const [cancellingId, setCancellingId] = useState<string | number | null>(null);
+    const [error, setError] = useState('');
+
+    const visibleAppointments = appointments.filter((appointment) => appointment.status !== 'cancelled');
+    const minDate = getTodayDate();
+
+    const loadAppointments = useCallback(async () => {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setError('Please log in again to view appointments.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const data = await requestJson(`${API_BASE_URL}/appointments`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            setAppointments(Array.isArray(data) ? data : []);
+        } catch (loadError) {
+            console.error('Failed to load appointments:', loadError);
+            setError(loadError instanceof Error ? loadError.message : 'Unable to load appointments from the server.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadAppointments();
+    }, [loadAppointments]);
+
+    const getMinTime = (selectedDate: string) => {
+        if (!selectedDate) {
+            return undefined;
+        }
+
+        return selectedDate === minDate ? getCurrentTime() : undefined;
+    };
+
+    const handleAddAppointment = async () => {
+        if (!newAppointment.doctor || !newAppointment.date || !newAppointment.time) {
+            setError('Doctor, date, and time are required.');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setError('Please log in again to add an appointment.');
+            return;
+        }
+
+        setSaving(true);
+        setError('');
+
+        try {
+            await requestJson(`${API_BASE_URL}/appointments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    doctor_name: newAppointment.doctor,
+                    specialty: newAppointment.specialty,
+                    date: newAppointment.date,
+                    time: newAppointment.time,
+                    location: newAppointment.location,
+                    reason: newAppointment.specialty || 'General appointment',
+                    status: 'upcoming'
+                })
+            });
+
+            await loadAppointments();
+            setNewAppointment(createEmptyFormState());
             setIsAdding(false);
+        } catch (saveError) {
+            console.error('Failed to save appointment:', saveError);
+            setError(saveError instanceof Error ? saveError.message : 'Unable to save appointment to MongoDB.');
+        } finally {
+            setSaving(false);
         }
     };
 
-    const handleReschedule = (id: number) => {
-        if (rescheduleData.date && rescheduleData.time) {
-            setAppointments(appointments.map(apt =>
-                apt.id === id ? { ...apt, date: rescheduleData.date, time: rescheduleData.time } : apt
-            ));
+    const handleReschedule = async (id: string | number) => {
+        if (!rescheduleData.date || !rescheduleData.time) {
+            setError('Date and time are required to update the appointment.');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setError('Please log in again to update the appointment.');
+            return;
+        }
+
+        setUpdatingId(id);
+        setError('');
+
+        try {
+            const data = await requestJson(`${API_BASE_URL}/appointments/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    date: rescheduleData.date,
+                    time: rescheduleData.time,
+                    status: 'upcoming'
+                })
+            });
+
+            setAppointments((current) =>
+                current.map((appointment) => ((appointment._id ?? appointment.id) === id ? data : appointment))
+            );
             setIsRescheduling(null);
             setRescheduleData({ date: '', time: '' });
+        } catch (updateError) {
+            console.error('Failed to update appointment:', updateError);
+            setError(updateError instanceof Error ? updateError.message : 'Unable to update appointment.');
+        } finally {
+            setUpdatingId(null);
         }
     };
 
-    const startReschedule = (appointment: any) => {
-        setIsRescheduling(appointment.id);
+    const handleCancelAppointment = async (id: string | number) => {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setError('Please log in again to cancel the appointment.');
+            return;
+        }
+
+        setCancellingId(id);
+        setError('');
+
+        try {
+            await requestJson(`${API_BASE_URL}/appointments/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            setAppointments((current) =>
+                current.map((appointment) =>
+                    (appointment._id ?? appointment.id) === id
+                        ? { ...appointment, status: 'cancelled' }
+                        : appointment
+                )
+            );
+
+            if (isRescheduling === id) {
+                setIsRescheduling(null);
+                setRescheduleData({ date: '', time: '' });
+            }
+        } catch (cancelError) {
+            console.error('Failed to cancel appointment:', cancelError);
+            setError(cancelError instanceof Error ? cancelError.message : 'Unable to cancel appointment.');
+        } finally {
+            setCancellingId(null);
+        }
+    };
+
+    const startReschedule = (appointment: Appointment) => {
+        const appointmentId = appointment._id ?? appointment.id;
+        setError('');
+        setIsRescheduling(appointmentId ?? null);
         setRescheduleData({ date: appointment.date, time: appointment.time });
     };
 
@@ -79,13 +278,22 @@ function Appointments() {
                         <p className="text-slate-500 dark:text-slate-400">Manage your visits and schedules</p>
                     </div>
                     <button
-                        onClick={() => setIsAdding(!isAdding)}
+                        onClick={() => {
+                            setError('');
+                            setIsAdding(!isAdding);
+                        }}
                         className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
                     >
                         <Plus className="w-5 h-5" />
-                        <span className="hidden sm:inline">{isAdding ? 'Cancel' : 'New Appointment'}</span>
+                        <span className="hidden sm:inline">New Appointment</span>
                     </button>
                 </div>
+
+                {error && (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 mb-6">
+                        {error}
+                    </div>
+                )}
 
                 {isAdding && (
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
@@ -106,15 +314,19 @@ function Appointments() {
                                 onChange={(e) => setNewAppointment({ ...newAppointment, specialty: e.target.value })}
                             />
                             <input
-                                type="text"
-                                placeholder="Date (e.g., Tomorrow, Jan 29)"
+                                type="date"
+                                min={minDate}
                                 className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={newAppointment.date}
-                                onChange={(e) => setNewAppointment({ ...newAppointment, date: e.target.value })}
+                                onChange={(e) => setNewAppointment({
+                                    ...newAppointment,
+                                    date: e.target.value,
+                                    time: newAppointment.date !== e.target.value ? '' : newAppointment.time
+                                })}
                             />
                             <input
-                                type="text"
-                                placeholder="Time (e.g., 10:00 AM)"
+                                type="time"
+                                min={getMinTime(newAppointment.date)}
                                 className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={newAppointment.time}
                                 onChange={(e) => setNewAppointment({ ...newAppointment, time: e.target.value })}
@@ -130,113 +342,139 @@ function Appointments() {
                         <div className="flex gap-2 mt-4">
                             <button
                                 onClick={handleAddAppointment}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                disabled={saving}
+                                className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-70 text-white px-6 py-2 rounded-lg font-medium transition-colors"
                             >
-                                Add Appointment
+                                {saving ? 'Saving...' : 'Add Appointment'}
                             </button>
                             <button
-                                onClick={() => setIsAdding(false)}
+                                onClick={() => {
+                                    setIsAdding(false);
+                                    setNewAppointment(createEmptyFormState());
+                                }}
                                 className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-6 py-2 rounded-lg font-medium transition-colors"
                             >
-                                Cancel
+                                Close
                             </button>
                         </div>
                     </div>
                 )}
 
-                <div className="grid gap-4">
-                    {appointments.map((apt) => (
-                        isRescheduling === apt.id ? (
-                            <div key={apt.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Reschedule Appointment</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-300 block mb-1">New Date</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g., Feb 10"
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            value={rescheduleData.date}
-                                            onChange={(e) => setRescheduleData({ ...rescheduleData, date: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-300 block mb-1">New Time</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g., 2:00 PM"
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            value={rescheduleData.time}
-                                            onChange={(e) => setRescheduleData({ ...rescheduleData, time: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleReschedule(apt.id)}
-                                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        Save Changes
-                                    </button>
-                                    <button
-                                        onClick={() => setIsRescheduling(null)}
-                                        className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div key={apt.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:shadow-md transition-shadow">
-                                <img
-                                    src={apt.image}
-                                    alt={apt.doctor}
-                                    className="w-20 h-20 rounded-2xl object-cover"
-                                />
-                                <div className="flex-1">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{apt.doctor}</h3>
-                                        <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full w-fit">
-                                            {apt.status === 'upcoming' ? 'Upcoming' : 'Past'}
-                                        </span>
-                                    </div>
-                                    <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm mb-3">{apt.specialty}</p>
+                {!loading && visibleAppointments.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 text-center">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No appointments</h3>
+                        <p className="text-slate-500 dark:text-slate-300">There are no upcoming appointments right now.</p>
+                    </div>
+                ) : !loading ? (
+                    <div className="grid gap-4">
+                        {visibleAppointments.map((apt) => {
+                            const appointmentId = apt._id ?? apt.id ?? `${apt.doctor_name}-${apt.date}-${apt.time}`;
+                            const doctorName = apt.doctor_name || apt.doctor_id || 'Doctor';
+                            const specialty = apt.specialty || apt.reason || 'General appointment';
+                            const location = apt.location || 'Location not provided';
 
-                                    <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400">
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar className="w-4 h-4" />
-                                            {apt.date}
+                            return isRescheduling === appointmentId ? (
+                                <div key={appointmentId} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+                                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Update Appointment</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-300 block mb-1">New Date</label>
+                                            <input
+                                                type="date"
+                                                min={minDate}
+                                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                value={rescheduleData.date}
+                                                onChange={(e) => setRescheduleData({
+                                                    ...rescheduleData,
+                                                    date: e.target.value,
+                                                    time: rescheduleData.date !== e.target.value ? '' : rescheduleData.time
+                                                })}
+                                            />
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Clock className="w-4 h-4" />
-                                            {apt.time}
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <MapPin className="w-4 h-4" />
-                                            {apt.location}
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-300 block mb-1">New Time</label>
+                                            <input
+                                                type="time"
+                                                min={getMinTime(rescheduleData.date)}
+                                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                value={rescheduleData.time}
+                                                onChange={(e) => setRescheduleData({ ...rescheduleData, time: e.target.value })}
+                                            />
                                         </div>
                                     </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleReschedule(appointmentId)}
+                                            disabled={updatingId === appointmentId}
+                                            className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-70 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                        >
+                                            {updatingId === appointmentId ? 'Updating...' : 'Save Changes'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setIsRescheduling(null);
+                                                setRescheduleData({ date: '', time: '' });
+                                            }}
+                                            className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                    <button
-                                        onClick={() => startReschedule(apt)}
-                                        className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-1"
-                                    >
-                                        <Edit2 className="w-4 h-4" />
-                                        Reschedule
-                                    </button>
-                                    <button className="flex-1 px-4 py-2 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        )
-                    ))}
-                </div>
+                            ) : (
+                                <div key={appointmentId} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:shadow-md transition-shadow">
+                                    <img
+                                        src={apt.image || placeholderImage}
+                                        alt={doctorName}
+                                        className="w-20 h-20 rounded-2xl object-cover"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{doctorName}</h3>
+                                            <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full w-fit">
+                                                {apt.status === 'past' ? 'Past' : 'Upcoming'}
+                                            </span>
+                                        </div>
+                                        <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm mb-3">{specialty}</p>
 
-                <div className="mt-8 text-center">
-                    {/* Back button moved to top */}
-                </div>
+                                        <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400">
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar className="w-4 h-4" />
+                                                {apt.date}
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="w-4 h-4" />
+                                                {apt.time}
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <MapPin className="w-4 h-4" />
+                                                {location}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                        <button
+                                            onClick={() => startReschedule(apt)}
+                                            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                            Update
+                                        </button>
+                                        <button
+                                            onClick={() => handleCancelAppointment(appointmentId)}
+                                            disabled={cancellingId === appointmentId}
+                                            className="flex-1 px-4 py-2 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-70"
+                                        >
+                                            {cancellingId === appointmentId ? 'Cancelling...' : 'Cancel'}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : null}
+
+                <div className="mt-8 text-center" />
             </div>
         </div>
     );

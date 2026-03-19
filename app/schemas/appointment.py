@@ -1,8 +1,27 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
+
 class AppointmentCreate(BaseModel):
-    patient_id: str
-    doctor_id: str
+    patient_id: Optional[str] = None
+    doctor_id: Optional[str] = None
+    doctor_name: Optional[str] = None
+    specialty: Optional[str] = None
     date: str
     time: str
-    reason: str
+    reason: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = "upcoming"
+
+
+class AppointmentUpdate(BaseModel):
+    patient_id: Optional[str] = None
+    doctor_id: Optional[str] = None
+    doctor_name: Optional[str] = None
+    specialty: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    reason: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = None

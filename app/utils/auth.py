@@ -11,18 +11,18 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         # Decode JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-        email: str = payload.get("sub")
+        user_id: str = payload.get("sub")
         role: str = payload.get("role")
 
-        if email is None:
+        if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token"
             )
 
-        # Return user information
+        # Return a consistent auth payload for all routes.
         return {
-            "email": email,
+            "sub": user_id,
             "role": role
         }
 
