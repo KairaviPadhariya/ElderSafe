@@ -36,6 +36,7 @@ type DoctorRecord = {
   hospital?: string | null;
   license_no?: string | null;
   experience_years?: number | null;
+  bio?: string | null;
 };
 
 type PatientRecord = {
@@ -91,6 +92,7 @@ function createFallbackProfile(
           'License No': 'Not provided',
           'Experience': 'Not provided',
           'Hospital': 'Not provided',
+          'Bio': 'Not provided',
         },
         emergencyContact: null
       };
@@ -157,6 +159,10 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     email: '',
     phone: '',
     address: '',
+    specialization: '',
+    licenseNo: '',
+    experienceYears: '',
+    bio: '',
   });
 
   const handleLogout = () => {
@@ -214,6 +220,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
             'License No': doctorData.license_no || 'Not provided',
             'Experience': doctorData.experience_years ? `${doctorData.experience_years} Years` : 'Not provided',
             'Hospital': doctorData.hospital || 'Not provided',
+            'Bio': doctorData.bio || 'Not provided',
           },
           emergencyContact: null
         });
@@ -329,6 +336,16 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
       email: displayProfile.email,
       phone: displayProfile.phone,
       address: displayProfile.address,
+      specialization: role === 'doctor' ? displayProfile.role : '',
+      licenseNo: role === 'doctor' && displayProfile.details['License No'] !== 'Not provided'
+        ? displayProfile.details['License No']
+        : '',
+      experienceYears: role === 'doctor' && displayProfile.details['Experience'] !== 'Not provided'
+        ? String(Number.parseInt(displayProfile.details['Experience'], 10) || '')
+        : '',
+      bio: role === 'doctor' && displayProfile.details['Bio'] !== 'Not provided'
+        ? displayProfile.details['Bio']
+        : '',
     });
     setIsEditing(true);
   };
@@ -357,14 +374,12 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
             email: editFormData.email,
             phone: editFormData.phone,
             hospital: editFormData.address,
-            specialization: displayProfile.role,
-            license_no: displayProfile.details['License No'] === 'Not provided'
-              ? null
-              : displayProfile.details['License No'],
-            experience_years: displayProfile.details['Experience'] === 'Not provided'
-              ? null
-              : Number.parseInt(displayProfile.details['Experience'], 10) || null,
-            bio: null,
+            specialization: editFormData.specialization || 'Doctor',
+            license_no: editFormData.licenseNo || null,
+            experience_years: editFormData.experienceYears
+              ? Number.parseInt(editFormData.experienceYears, 10) || null
+              : null,
+            bio: editFormData.bio || null,
           })
         });
 
@@ -381,13 +396,12 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           email: editFormData.email,
           phone: editFormData.phone,
           hospital: editFormData.address,
-          specialization: displayProfile.role,
-          license_no: displayProfile.details['License No'] === 'Not provided'
-            ? null
-            : displayProfile.details['License No'],
-          experience_years: displayProfile.details['Experience'] === 'Not provided'
-            ? null
-            : Number.parseInt(displayProfile.details['Experience'], 10) || null,
+          specialization: editFormData.specialization || 'Doctor',
+          license_no: editFormData.licenseNo || null,
+          experience_years: editFormData.experienceYears
+            ? Number.parseInt(editFormData.experienceYears, 10) || null
+            : null,
+          bio: editFormData.bio || null,
         }));
       } catch (error) {
         console.error('Failed to save doctor profile:', error);
@@ -516,7 +530,21 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
       name: editFormData.name,
       email: editFormData.email,
       phone: editFormData.phone,
-      address: editFormData.address
+      address: editFormData.address,
+      ...(role === 'doctor'
+        ? {
+            role: editFormData.specialization || 'Doctor',
+            details: {
+              ...prev.details,
+              'License No': editFormData.licenseNo || 'Not provided',
+              'Experience': editFormData.experienceYears
+                ? `${editFormData.experienceYears} Years`
+                : 'Not provided',
+              'Hospital': editFormData.address || 'Not provided',
+              'Bio': editFormData.bio || 'Not provided',
+            }
+          }
+        : {})
     }));
     setIsEditing(false);
     alert('Profile updated successfully!');
@@ -668,6 +696,46 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
                           rows={3}
                         />
                       </div>
+                      {role === 'doctor' && (
+                        <>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">Specialization</label>
+                            <input
+                              type="text"
+                              value={editFormData.specialization}
+                              onChange={(e) => setEditFormData({ ...editFormData, specialization: e.target.value })}
+                              className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">License Number</label>
+                            <input
+                              type="text"
+                              value={editFormData.licenseNo}
+                              onChange={(e) => setEditFormData({ ...editFormData, licenseNo: e.target.value })}
+                              className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">Experience (Years)</label>
+                            <input
+                              type="number"
+                              value={editFormData.experienceYears}
+                              onChange={(e) => setEditFormData({ ...editFormData, experienceYears: e.target.value })}
+                              className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">Bio</label>
+                            <textarea
+                              value={editFormData.bio}
+                              onChange={(e) => setEditFormData({ ...editFormData, bio: e.target.value })}
+                              className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              rows={4}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
