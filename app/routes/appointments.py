@@ -126,16 +126,11 @@ async def cancel_appointment(
         raise HTTPException(status_code=404, detail="Appointment not found")
 
     try:
-        await database.appointments.update_one(
-            {"_id": object_id},
-            {
-                "$set": {
-                    "status": "cancelled",
-                    "updated_at": datetime.utcnow()
-                }
-            }
-        )
+        result = await database.appointments.delete_one({"_id": object_id})
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel appointment: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete appointment: {exc}")
 
-    return {"message": "Appointment cancelled successfully"}
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    return {"message": "Appointment deleted successfully"}

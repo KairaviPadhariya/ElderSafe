@@ -86,6 +86,7 @@ function Appointments() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isAdding, setIsAdding] = useState(false);
     const [isRescheduling, setIsRescheduling] = useState<string | number | null>(null);
+    const [appointmentToDelete, setAppointmentToDelete] = useState<string | number | null>(null);
     const [newAppointment, setNewAppointment] = useState<AppointmentFormState>(createEmptyFormState());
     const [rescheduleData, setRescheduleData] = useState({ date: '', time: '' });
     const [loading, setLoading] = useState(true);
@@ -242,11 +243,7 @@ function Appointments() {
             });
 
             setAppointments((current) =>
-                current.map((appointment) =>
-                    (appointment._id ?? appointment.id) === id
-                        ? { ...appointment, status: 'cancelled' }
-                        : appointment
-                )
+                current.filter((appointment) => (appointment._id ?? appointment.id) !== id)
             );
 
             if (isRescheduling === id) {
@@ -258,6 +255,7 @@ function Appointments() {
             setError(cancelError instanceof Error ? cancelError.message : 'Unable to cancel appointment.');
         } finally {
             setCancellingId(null);
+            setAppointmentToDelete(null);
         }
     };
 
@@ -292,6 +290,45 @@ function Appointments() {
                 {error && (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 mb-6">
                         {error}
+                    </div>
+                )}
+
+                {appointmentToDelete !== null && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                        <div
+                            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+                            onClick={() => {
+                                if (!cancellingId) {
+                                    setAppointmentToDelete(null);
+                                }
+                            }}
+                        />
+                        <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-2xl">
+                            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+                                Delete appointment?
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-300 mb-6">
+                                This will permanently remove the appointment from your records.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    type="button"
+                                    disabled={cancellingId !== null}
+                                    onClick={() => setAppointmentToDelete(null)}
+                                    className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-70"
+                                >
+                                    Keep Appointment
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={cancellingId !== null}
+                                    onClick={() => handleCancelAppointment(appointmentToDelete)}
+                                    className="px-4 py-2 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors disabled:opacity-70"
+                                >
+                                    {cancellingId !== null ? 'Deleting...' : 'Delete'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -461,7 +498,7 @@ function Appointments() {
                                             Update
                                         </button>
                                         <button
-                                            onClick={() => handleCancelAppointment(appointmentId)}
+                                            onClick={() => setAppointmentToDelete(appointmentId)}
                                             disabled={cancellingId === appointmentId}
                                             className="flex-1 px-4 py-2 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-70"
                                         >
