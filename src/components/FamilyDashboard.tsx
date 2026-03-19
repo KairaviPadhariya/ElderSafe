@@ -12,13 +12,24 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
 interface Props {
-  userName: string;
+  userName?: string;
 }
 
 function FamilyDashboard({ userName } : Props) {
     const navigate = useNavigate();
+    const [name, setName] = useState("User");
+
+    useEffect(() => {
+        if (userName) {
+            setName(userName);
+        } else {
+            const storedName = localStorage.getItem("userName");
+            if (storedName) setName(storedName);
+        }
+    }, [userName]);
 
     // Mock data for the chart
     const bpData = [
@@ -38,7 +49,7 @@ function FamilyDashboard({ userName } : Props) {
             <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-                    Welcome, {userName}
+                    Welcome, {name}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-lg">Monitoring status for: <span className="font-semibold text-slate-900 dark:text-white">Savitri (Mother)</span></p>
                 </div>

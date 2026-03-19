@@ -62,11 +62,11 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     switch (role) {
       case 'doctor':
         return {
-          name: 'Dr. Arun Kumar',
+          name: parsedStoredProfile.name || loggedInUserName,
           role: 'Cardiologist',
-          email: 'arun.kumar@hospital.com',
-          phone: '+1 (555) 999-8888',
-          address: 'General Hospital, Cardiology Dept, Room 304',
+          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
+          phone: parsedStoredProfile.phone || 'Not provided',
+          address: parsedStoredProfile.address || 'Not provided',
           details: {
             'License No': 'MD-12345-CA',
             'Experience': '15 Years',
@@ -76,11 +76,11 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
         };
       case 'family':
         return {
-          name: 'Rajesh Kumar',
+          name: parsedStoredProfile.name || loggedInUserName,
           role: 'Family Member (Son)',
-          email: 'rajesh.k@email.com',
-          phone: '+1 (555) 234-5678',
-          address: '456 Pine Street, Springfield, IL 62702',
+          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
+          phone: parsedStoredProfile.phone || 'Not provided',
+          address: parsedStoredProfile.address || 'Not provided',
           details: {
             'Relation': 'Son',
             'Monitoring': 'Savitri Devi',

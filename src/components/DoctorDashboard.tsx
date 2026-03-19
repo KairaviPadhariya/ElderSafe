@@ -2,15 +2,23 @@ import {
   Users,
   Calendar,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Props {
-  userName: string;
+  userName?: string;
 }
 
 function DoctorDashboard({ userName }: Props) {
+  const [name, setName] = useState("Doctor");
 
-  const displayName = userName || "Doctor";
+  useEffect(() => {
+    if (userName) {
+      setName(userName);
+    } else {
+      const storedName = localStorage.getItem("userName");
+      if (storedName) setName(storedName);
+    }
+  }, [userName]);
 
   const todayString = new Date().toISOString().slice(0, 10);
 
@@ -73,7 +81,7 @@ function DoctorDashboard({ userName }: Props) {
 
       <div className="mb-10">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-          Welcome back, Dr. {displayName}
+          Welcome back, Dr. {name}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
           Here is your daily overview
