@@ -8,29 +8,149 @@ import {
   Plus,
   TrendingUp,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import QuickStats from './QuickStats';
 import SOSButton from './SOSButton';
-import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
+const REQUEST_TIMEOUT_MS = 12000;
 
 interface Props {
-  userName?: string; // make optional
+  userName?: string;
+}
+
+type Appointment = {
+  _id?: string;
+  id?: string | number;
+  doctor_name?: string;
+  doctor_id?: string;
+  specialty?: string;
+  date: string;
+  time: string;
+  status?: string;
+};
+
+async function requestJson(url: string, options: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      throw new Error(data?.detail || data?.message || 'Request failed');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check that the backend and MongoDB are running.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function getAppointmentDateTime(appointment: Appointment) {
+  return new Date(`${appointment.date}T${appointment.time}`);
+}
+
+function formatAppointmentSummary(appointment: Appointment) {
+  const appointmentDate = getAppointmentDateTime(appointment);
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+
+  const isToday = appointmentDate.toDateString() === now.toDateString();
+  const isTomorrow = appointmentDate.toDateString() === tomorrow.toDateString();
+  const dayLabel = isToday
+    ? 'Today'
+    : isTomorrow
+      ? 'Tomorrow'
+      : appointmentDate.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+  const timeLabel = appointmentDate.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+  const doctorName = appointment.doctor_name || appointment.doctor_id || 'your doctor';
+
+  return `${dayLabel}, ${timeLabel} with ${doctorName}`;
 }
 
 function PatientDashboard({ userName }: Props) {
   const navigate = useNavigate();
-
-  const [name, setName] = useState("User");
+  const [name, setName] = useState('User');
+  const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
+  const [appointmentError, setAppointmentError] = useState('');
 
   useEffect(() => {
-    // Priority: prop → localStorage → fallback
     if (userName) {
       setName(userName);
     } else {
-      const storedName = localStorage.getItem("userName");
-      if (storedName) setName(storedName);
+      const storedName = localStorage.getItem('userName');
+      if (storedName) {
+        setName(storedName);
+      }
     }
   }, [userName]);
+
+  useEffect(() => {
+    const loadNextAppointment = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setAppointmentError('Please log in again to view your appointments.');
+        return;
+      }
+
+      try {
+        const data = await requestJson(`${API_BASE_URL}/appointments`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const appointments = Array.isArray(data) ? (data as Appointment[]) : [];
+        const now = new Date();
+        const upcomingAppointments = appointments
+          .filter((appointment) => appointment.status !== 'cancelled')
+          .filter((appointment) => {
+            const appointmentDate = getAppointmentDateTime(appointment);
+            return !Number.isNaN(appointmentDate.getTime()) && appointmentDate >= now;
+          })
+          .sort((first, second) => getAppointmentDateTime(first).getTime() - getAppointmentDateTime(second).getTime());
+
+        setNextAppointment(upcomingAppointments[0] ?? null);
+        setAppointmentError('');
+      } catch (error) {
+        console.error('Failed to load next appointment:', error);
+        setAppointmentError(error instanceof Error ? error.message : 'Unable to load your next appointment.');
+      }
+    };
+
+    loadNextAppointment();
+  }, []);
+
+  const appointmentStats = nextAppointment
+    ? `Next: ${formatAppointmentSummary(nextAppointment)}`
+    : appointmentError
+      ? 'Unable to load appointment'
+      : 'No upcoming appointments';
 
   const featureCards = [
     {
@@ -57,7 +177,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Schedule and manage doctor visits',
       icon: Calendar,
       color: 'bg-violet-500',
-      stats: 'Next: Tomorrow, 10:00 AM',
+      stats: appointmentStats,
       path: '/appointments'
     },
     {
@@ -96,7 +216,7 @@ function PatientDashboard({ userName }: Props) {
           Welcome back, {name}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
-          Here's your health overview for today
+          Here&apos;s your health overview for today
         </p>
       </div>
 
@@ -107,7 +227,9 @@ function PatientDashboard({ userName }: Props) {
           Next Appointment
         </h3>
         <p className="text-slate-700 dark:text-slate-300">
-          Tomorrow, 10:00 AM with Dr. Arun Kumar
+          {nextAppointment
+            ? formatAppointmentSummary(nextAppointment)
+            : appointmentError || 'No upcoming appointments scheduled.'}
         </p>
       </div>
 
@@ -170,7 +292,7 @@ function PatientDashboard({ userName }: Props) {
               Health Reminders
             </h3>
             <p className="text-amber-800">
-              Don't forget your medication at <b>6:00 PM</b>.
+              Don&apos;t forget your medication at <b>6:00 PM</b>.
             </p>
           </div>
         </div>
