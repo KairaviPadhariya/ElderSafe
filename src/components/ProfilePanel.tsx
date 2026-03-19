@@ -28,6 +28,16 @@ type ProfileData = {
   } | null;
 };
 
+type DoctorRecord = {
+  name?: string;
+  email?: string;
+  specialization?: string;
+  phone?: string | null;
+  hospital?: string | null;
+  license_no?: string | null;
+  experience_years?: number | null;
+};
+
 type PatientRecord = {
   name?: string;
   age?: number;
@@ -47,7 +57,69 @@ type PatientRecord = {
   address?: string | null;
 };
 
+type FamilyRecord = {
+  name?: string;
+  email?: string;
+  patient_name?: string;
+  relation?: string;
+  access_level?: string;
+  phone?: string | null;
+  address?: string | null;
+};
+
 const API_BASE_URL = 'http://127.0.0.1:8000';
+
+function createFallbackProfile(
+  role: string,
+  name: string,
+  email: string,
+  storedProfile: StoredProfile
+): ProfileData {
+  const baseProfile = {
+    name: storedProfile.name || name,
+    email: storedProfile.email || email || 'Not provided',
+    phone: storedProfile.phone || 'Not provided',
+    address: storedProfile.address || 'Not provided',
+  };
+
+  switch (role) {
+    case 'doctor':
+      return {
+        ...baseProfile,
+        role: 'Doctor',
+        details: {
+          'License No': 'Not provided',
+          'Experience': 'Not provided',
+          'Hospital': 'Not provided',
+        },
+        emergencyContact: null
+      };
+    case 'family':
+      return {
+        ...baseProfile,
+        role: 'Family Member',
+        details: {
+          'Relation': 'Not provided',
+          'Monitoring': 'Not provided',
+          'Access Level': 'Not provided',
+        },
+        emergencyContact: null
+      };
+    default:
+      return {
+        ...baseProfile,
+        role: 'Patient',
+        details: {
+          'Blood Type': 'Not provided',
+          'Age': 'Not provided',
+        },
+        emergencyContact: {
+          name: 'Not provided',
+          phone: 'Not provided',
+        }
+      };
+  }
+}
 
 function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
   const navigate = useNavigate();
@@ -77,7 +149,9 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     }
   }, [storedProfile]);
   const [isEditing, setIsEditing] = useState(false);
+  const [doctorRecord, setDoctorRecord] = useState<DoctorRecord | null>(null);
   const [patientRecord, setPatientRecord] = useState<PatientRecord | null>(null);
+  const [familyRecord, setFamilyRecord] = useState<FamilyRecord | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
@@ -94,52 +168,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
   };
 
   const initialProfile = useMemo<ProfileData>(() => {
-    switch (role) {
-      case 'doctor':
-        return {
-          name: parsedStoredProfile.name || loggedInUserName,
-          role: 'Cardiologist',
-          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
-          phone: parsedStoredProfile.phone || 'Not provided',
-          address: parsedStoredProfile.address || 'Not provided',
-          details: {
-            'License No': 'MD-12345-CA',
-            'Experience': '15 Years',
-            'Hospital': 'City General Hospital',
-          },
-          emergencyContact: null
-        };
-      case 'family':
-        return {
-          name: parsedStoredProfile.name || loggedInUserName,
-          role: 'Family Member (Son)',
-          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
-          phone: parsedStoredProfile.phone || 'Not provided',
-          address: parsedStoredProfile.address || 'Not provided',
-          details: {
-            'Relation': 'Son',
-            'Monitoring': 'Savitri Devi',
-            'Access Level': 'Full Access',
-          },
-          emergencyContact: null
-        };
-      default: // patient
-        return {
-          name: parsedStoredProfile.name || loggedInUserName,
-          role: 'Patient',
-          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
-          phone: parsedStoredProfile.phone || 'Not provided',
-          address: parsedStoredProfile.address || 'Not provided',
-          details: {
-            'Blood Type': 'O+',
-            'DOB': '1952-05-15',
-          },
-          emergencyContact: {
-            name: 'Rahul Sharma (Son)',
-            phone: '+1 (555) 987-6543',
-          }
-        };
-    }
+    return createFallbackProfile(role, loggedInUserName, loggedInUserEmail, parsedStoredProfile);
   }, [loggedInUserEmail, loggedInUserName, parsedStoredProfile, role]);
 
   const [displayProfile, setDisplayProfile] = useState(initialProfile);
@@ -174,6 +203,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           return;
         }
 
+        setDoctorRecord(doctorData);
         setDisplayProfile({
           name: doctorData.name || loggedInUserName,
           role: doctorData.specialization || 'Doctor',
@@ -193,6 +223,54 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     };
 
     loadDoctorProfile();
+  }, [isOpen, loggedInUserEmail, loggedInUserName, role]);
+
+  useEffect(() => {
+    if (!isOpen || role !== 'family') {
+      return;
+    }
+
+    const loadFamilyProfile = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/family/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const responseText = await response.text();
+        const familyData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok || !familyData) {
+          return;
+        }
+
+        setFamilyRecord(familyData);
+        setDisplayProfile({
+          name: familyData.name || loggedInUserName,
+          role: `Family Member (${familyData.relation || 'Caregiver'})`,
+          email: familyData.email || loggedInUserEmail || 'Not provided',
+          phone: familyData.phone || 'Not provided',
+          address: familyData.address || 'Not provided',
+          details: {
+            'Relation': familyData.relation || 'Not provided',
+            'Monitoring': familyData.patient_name || 'Not provided',
+            'Access Level': familyData.access_level || 'Not provided',
+          },
+          emergencyContact: null
+        });
+      } catch (error) {
+        console.error('Failed to load family profile:', error);
+      }
+    };
+
+    loadFamilyProfile();
   }, [isOpen, loggedInUserEmail, loggedInUserName, role]);
 
   useEffect(() => {
@@ -233,8 +311,8 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
             'Age': patientData.age ? String(patientData.age) : 'Not provided',
           },
           emergencyContact: {
-            name: 'Rahul Sharma (Son)',
-            phone: '+1 (555) 987-6543',
+            name: 'Not provided',
+            phone: 'Not provided',
           }
         });
       } catch (error) {
@@ -296,6 +374,21 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
         if (!response.ok) {
           throw new Error(responseData?.detail || 'Failed to update doctor profile.');
         }
+
+        setDoctorRecord((prev) => ({
+          ...(prev ?? {}),
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          hospital: editFormData.address,
+          specialization: displayProfile.role,
+          license_no: displayProfile.details['License No'] === 'Not provided'
+            ? null
+            : displayProfile.details['License No'],
+          experience_years: displayProfile.details['Experience'] === 'Not provided'
+            ? null
+            : Number.parseInt(displayProfile.details['Experience'], 10) || null,
+        }));
       } catch (error) {
         console.error('Failed to save doctor profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update doctor profile.');
@@ -309,6 +402,11 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
         return;
       }
 
+      if (!patientRecord) {
+        alert('Please complete your medical details first before editing the patient profile.');
+        return;
+      }
+
       try {
         const response = await fetch(`${API_BASE_URL}/patients`, {
           method: 'POST',
@@ -318,19 +416,19 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           },
           body: JSON.stringify({
             name: editFormData.name,
-            age: patientRecord?.age ?? 0,
-            gender: patientRecord?.gender || 'other',
-            height: patientRecord?.height ?? 0,
-            weight: patientRecord?.weight ?? 0,
-            bmi: patientRecord?.bmi ?? null,
-            blood_group: patientRecord?.blood_group || 'Unknown',
-            o2_saturation: patientRecord?.o2_saturation ?? 0,
-            heart_rate: patientRecord?.heart_rate ?? 0,
-            sbp: patientRecord?.sbp ?? 0,
-            dbp: patientRecord?.dbp ?? 0,
-            fbs: patientRecord?.fbs ?? null,
-            ppbs: patientRecord?.ppbs ?? null,
-            cholesterol: patientRecord?.cholesterol ?? null,
+            age: patientRecord.age,
+            gender: patientRecord.gender || 'other',
+            height: patientRecord.height,
+            weight: patientRecord.weight,
+            bmi: patientRecord.bmi ?? null,
+            blood_group: patientRecord.blood_group || '',
+            o2_saturation: patientRecord.o2_saturation,
+            heart_rate: patientRecord.heart_rate,
+            sbp: patientRecord.sbp,
+            dbp: patientRecord.dbp,
+            fbs: patientRecord.fbs ?? null,
+            ppbs: patientRecord.ppbs ?? null,
+            cholesterol: patientRecord.cholesterol ?? null,
             phone: editFormData.phone === 'Not provided' ? null : editFormData.phone,
             address: editFormData.address === 'Not provided' ? null : editFormData.address,
           })
@@ -352,6 +450,56 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
       } catch (error) {
         console.error('Failed to save patient profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update patient profile.');
+        return;
+      }
+    } else if (role === 'family') {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('Please log in again to update your profile.');
+        return;
+      }
+
+      if (!familyRecord) {
+        alert('Please complete your family details first before editing the family profile.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/family`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: editFormData.name,
+            email: editFormData.email,
+            patient_name: familyRecord.patient_name || '',
+            relation: familyRecord.relation || '',
+            access_level: familyRecord.access_level || 'Full Access',
+            phone: editFormData.phone === 'Not provided' ? null : editFormData.phone,
+            address: editFormData.address === 'Not provided' ? null : editFormData.address,
+          })
+        });
+
+        const responseText = await response.text();
+        const responseData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok) {
+          throw new Error(responseData?.detail || 'Failed to update family profile.');
+        }
+
+        setFamilyRecord((prev) => ({
+          ...(prev ?? {}),
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          address: editFormData.address,
+        }));
+      } catch (error) {
+        console.error('Failed to save family profile:', error);
+        alert(error instanceof Error ? error.message : 'Failed to update family profile.');
         return;
       }
     } else {

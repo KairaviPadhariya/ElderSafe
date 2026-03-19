@@ -9,7 +9,7 @@ from app.routes import (
     medications,
     activity_logs,
     audit_logs,
-    caregiver_access,
+    family,
     daily_health_logs,
     health_trends,
     medical_history,
@@ -37,7 +37,7 @@ app.include_router(appointments.router)
 app.include_router(medications.router)
 app.include_router(activity_logs.router)
 app.include_router(audit_logs.router)
-app.include_router(caregiver_access.router)
+app.include_router(family.router)
 app.include_router(daily_health_logs.router)
 app.include_router(health_trends.router)
 app.include_router(medical_history.router)

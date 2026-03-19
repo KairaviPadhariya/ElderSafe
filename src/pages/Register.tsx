@@ -45,7 +45,7 @@ function Register() {
         try {
             await api.register({ name: name.trim(), email: email.trim(), password, role });
 
-            if (role === 'patient' || role === 'doctor') {
+            if (role === 'patient' || role === 'doctor' || role === 'family') {
                 const loginData = await api.login({ email: email.trim(), password });
                 const decoded = decodeJWT(loginData.access_token);
 
@@ -60,7 +60,13 @@ function Register() {
                     localStorage.setItem('userRole', role);
                 }
 
-                navigate(role === 'patient' ? '/medical-details' : '/doctor-details');
+                navigate(
+                    role === 'patient'
+                        ? '/medical-details'
+                        : role === 'doctor'
+                            ? '/doctor-details'
+                            : '/family-details'
+                );
             } else {
                 navigate('/login');
             }
