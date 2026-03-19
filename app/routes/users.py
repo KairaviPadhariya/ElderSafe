@@ -13,11 +13,9 @@ router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
 # -------- PASSWORD HASH --------
 def hash_password(password: str):
     return pwd_context.hash(password)
-
 
 # ---------------- CREATE USER ----------------
 @router.post("/users")
@@ -27,13 +25,11 @@ async def create_user(user: UserCreate):
 
     # hash password
     user_dict["password"] = hash_password(user.password)
-
     user_dict["created_at"] = datetime.utcnow()
 
     result = await database.users.insert_one(user_dict)
 
     return {"id": str(result.inserted_id)}
-
 
 # ---------------- GET ALL USERS ----------------
 @router.get("/users")
@@ -46,7 +42,6 @@ async def get_users(current_user: dict = Depends(verify_token)):
         users.append(user)
 
     return users
-
 
 # ---------------- GET SINGLE USER ----------------
 @router.get("/users/{user_id}")
@@ -61,9 +56,7 @@ async def get_user(user_id: str, current_user: dict = Depends(verify_token)):
         raise HTTPException(status_code=404, detail="User not found")
 
     user["_id"] = str(user["_id"])
-
     return user
-
 
 # ---------------- UPDATE USER ----------------
 @router.put("/users/{user_id}")
@@ -84,12 +77,17 @@ async def update_user(user_id: str, user: UserCreate, current_user: dict = Depen
 
     return {"message": "User updated"}
 
-
-# ---------------- DELETE USER ----------------
+# ---------------- DELETE USER (ADMIN ONLY) ----------------
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: dict = Depends(verify_token)):
 
-    logged_user = await database.users.find_one({"_id": ObjectId(current_user["user_id"])})
+    # ✅ FIX: use "sub"
+    try:
+        logged_user = await database.users.find_one({
+            "_id": ObjectId(current_user["sub"])
+        })
+    except:
+        raise HTTPException(status_code=400, detail="Invalid token user ID")
 
     if not logged_user:
         raise HTTPException(status_code=404, detail="Logged user not found")
@@ -104,15 +102,14 @@ async def delete_user(user_id: str, current_user: dict = Depends(verify_token)):
 
     return {"message": "User deleted successfully"}
 
-
 # ---------------- GET CURRENT USER ----------------
 @router.get("/users/me")
 async def get_current_user(current_user: dict = Depends(verify_token)):
 
     try:
-        user_id = ObjectId(current_user["user_id"])
+        user_id = ObjectId(current_user["sub"])   # ✅ FIX
     except:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+        raise HTTPException(status_code=400, detail="Invalid user ID in token")
 
     user = await database.users.find_one({"_id": user_id})
 
@@ -120,16 +117,16 @@ async def get_current_user(current_user: dict = Depends(verify_token)):
         raise HTTPException(status_code=404, detail="User not found")
 
     return {
-        "name": user["name"],
-        "email": user["email"],
-        "role": user["role"]
+        "id": str(user["_id"]),
+        "name": user.get("name"),
+        "email": user.get("email"),
+        "role": user.get("role")
     }
 
 # ---------------- LOGIN ----------------
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
-    # username field is used for email
     db_user = await database.users.find_one({"email": form_data.username})
 
     if not db_user:
@@ -141,7 +138,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     token = create_access_token({
-        "sub": str(db_user["_id"]),
+        "sub": str(db_user["_id"]),   # ✅ STANDARD
         "role": db_user["role"]
     })
 
