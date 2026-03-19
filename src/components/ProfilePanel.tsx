@@ -15,6 +15,40 @@ type StoredProfile = {
   address?: string;
 };
 
+type ProfileData = {
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  address: string;
+  details: Record<string, string>;
+  emergencyContact: {
+    name: string;
+    phone: string;
+  } | null;
+};
+
+type PatientRecord = {
+  name?: string;
+  age?: number;
+  gender?: string;
+  height?: number;
+  weight?: number;
+  bmi?: number | null;
+  blood_group?: string;
+  o2_saturation?: number;
+  heart_rate?: number;
+  sbp?: number;
+  dbp?: number;
+  fbs?: number | null;
+  ppbs?: number | null;
+  cholesterol?: number | null;
+  phone?: string | null;
+  address?: string | null;
+};
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
   const navigate = useNavigate();
   const loggedInUserName = localStorage.getItem('userName') || 'User';
@@ -43,6 +77,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     }
   }, [storedProfile]);
   const [isEditing, setIsEditing] = useState(false);
+  const [patientRecord, setPatientRecord] = useState<PatientRecord | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
@@ -58,7 +93,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     navigate('/login');
   };
 
-  const initialProfile = useMemo(() => {
+  const initialProfile = useMemo<ProfileData>(() => {
     switch (role) {
       case 'doctor':
         return {
@@ -113,6 +148,103 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     setDisplayProfile(initialProfile);
   }, [initialProfile]);
 
+  useEffect(() => {
+    if (!isOpen || role !== 'doctor') {
+      return;
+    }
+
+    const loadDoctorProfile = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/doctors/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const responseText = await response.text();
+        const doctorData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok || !doctorData) {
+          return;
+        }
+
+        setDisplayProfile({
+          name: doctorData.name || loggedInUserName,
+          role: doctorData.specialization || 'Doctor',
+          email: doctorData.email || loggedInUserEmail || 'Not provided',
+          phone: doctorData.phone || 'Not provided',
+          address: doctorData.hospital || 'Not provided',
+          details: {
+            'License No': doctorData.license_no || 'Not provided',
+            'Experience': doctorData.experience_years ? `${doctorData.experience_years} Years` : 'Not provided',
+            'Hospital': doctorData.hospital || 'Not provided',
+          },
+          emergencyContact: null
+        });
+      } catch (error) {
+        console.error('Failed to load doctor profile:', error);
+      }
+    };
+
+    loadDoctorProfile();
+  }, [isOpen, loggedInUserEmail, loggedInUserName, role]);
+
+  useEffect(() => {
+    if (!isOpen || role !== 'patient') {
+      return;
+    }
+
+    const loadPatientProfile = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/patients/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const responseText = await response.text();
+        const patientData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok || !patientData) {
+          return;
+        }
+
+        setPatientRecord(patientData);
+        setDisplayProfile({
+          name: patientData.name || loggedInUserName,
+          role: 'Patient',
+          email: loggedInUserEmail || 'Not provided',
+          phone: patientData.phone || 'Not provided',
+          address: patientData.address || 'Not provided',
+          details: {
+            'Blood Type': patientData.blood_group || 'Not provided',
+            'Age': patientData.age ? String(patientData.age) : 'Not provided',
+          },
+          emergencyContact: {
+            name: 'Rahul Sharma (Son)',
+            phone: '+1 (555) 987-6543',
+          }
+        });
+      } catch (error) {
+        console.error('Failed to load patient profile:', error);
+      }
+    };
+
+    loadPatientProfile();
+  }, [isOpen, loggedInUserEmail, loggedInUserName, role]);
+
   const handleEditClick = () => {
     setEditFormData({
       name: displayProfile.name,
@@ -123,15 +255,114 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     setIsEditing(true);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     localStorage.setItem('userName', editFormData.name);
     localStorage.setItem('userEmail', editFormData.email);
-    localStorage.setItem(userProfileKey, JSON.stringify({
-      name: editFormData.name,
-      email: editFormData.email,
-      phone: editFormData.phone,
-      address: editFormData.address,
-    }));
+
+    if (role === 'doctor') {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('Please log in again to update your profile.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/doctors`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: editFormData.name,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            hospital: editFormData.address,
+            specialization: displayProfile.role,
+            license_no: displayProfile.details['License No'] === 'Not provided'
+              ? null
+              : displayProfile.details['License No'],
+            experience_years: displayProfile.details['Experience'] === 'Not provided'
+              ? null
+              : Number.parseInt(displayProfile.details['Experience'], 10) || null,
+            bio: null,
+          })
+        });
+
+        const responseText = await response.text();
+        const responseData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok) {
+          throw new Error(responseData?.detail || 'Failed to update doctor profile.');
+        }
+      } catch (error) {
+        console.error('Failed to save doctor profile:', error);
+        alert(error instanceof Error ? error.message : 'Failed to update doctor profile.');
+        return;
+      }
+    } else if (role === 'patient') {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('Please log in again to update your profile.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/patients`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: editFormData.name,
+            age: patientRecord?.age ?? 0,
+            gender: patientRecord?.gender || 'other',
+            height: patientRecord?.height ?? 0,
+            weight: patientRecord?.weight ?? 0,
+            bmi: patientRecord?.bmi ?? null,
+            blood_group: patientRecord?.blood_group || 'Unknown',
+            o2_saturation: patientRecord?.o2_saturation ?? 0,
+            heart_rate: patientRecord?.heart_rate ?? 0,
+            sbp: patientRecord?.sbp ?? 0,
+            dbp: patientRecord?.dbp ?? 0,
+            fbs: patientRecord?.fbs ?? null,
+            ppbs: patientRecord?.ppbs ?? null,
+            cholesterol: patientRecord?.cholesterol ?? null,
+            phone: editFormData.phone === 'Not provided' ? null : editFormData.phone,
+            address: editFormData.address === 'Not provided' ? null : editFormData.address,
+          })
+        });
+
+        const responseText = await response.text();
+        const responseData = responseText ? JSON.parse(responseText) : null;
+
+        if (!response.ok) {
+          throw new Error(responseData?.detail || 'Failed to update patient profile.');
+        }
+
+        setPatientRecord((prev) => ({
+          ...(prev ?? {}),
+          name: editFormData.name,
+          phone: editFormData.phone,
+          address: editFormData.address,
+        }));
+      } catch (error) {
+        console.error('Failed to save patient profile:', error);
+        alert(error instanceof Error ? error.message : 'Failed to update patient profile.');
+        return;
+      }
+    } else {
+      localStorage.setItem(userProfileKey, JSON.stringify({
+        name: editFormData.name,
+        email: editFormData.email,
+        phone: editFormData.phone,
+        address: editFormData.address,
+      }));
+    }
+
     setDisplayProfile(prev => ({
       ...prev,
       name: editFormData.name,
@@ -140,7 +371,6 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
       address: editFormData.address
     }));
     setIsEditing(false);
-    // Show success message
     alert('Profile updated successfully!');
   };
 

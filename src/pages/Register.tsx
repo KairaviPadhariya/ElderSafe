@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Heart, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../utils/api';
+import { api, decodeJWT } from '../utils/api';
 
 function Register() {
     const [loading, setLoading] = useState(false);
@@ -44,7 +44,26 @@ function Register() {
 
         try {
             await api.register({ name: name.trim(), email: email.trim(), password, role });
-            navigate('/login');
+
+            if (role === 'patient' || role === 'doctor') {
+                const loginData = await api.login({ email: email.trim(), password });
+                const decoded = decodeJWT(loginData.access_token);
+
+                localStorage.setItem('token', loginData.access_token);
+                localStorage.setItem('isAuthenticated', 'true');
+                localStorage.setItem('userName', name.trim());
+                localStorage.setItem('userEmail', email.trim());
+
+                if (decoded?.role) {
+                    localStorage.setItem('userRole', decoded.role);
+                } else {
+                    localStorage.setItem('userRole', role);
+                }
+
+                navigate(role === 'patient' ? '/medical-details' : '/doctor-details');
+            } else {
+                navigate('/login');
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
         } finally {

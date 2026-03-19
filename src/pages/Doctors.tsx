@@ -1,38 +1,41 @@
 
 import { Stethoscope, Phone, Mail } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import BackButton from '../components/BackButton';
 
-function Doctors() {
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
-    const doctors = [
-        {
-            id: 1,
-            name: 'Dr. Arun Kumar',
-            specialty: 'Cardiologist',
-            hospital: 'Heart Care Center',
-            phone: '+1 (555) 123-4567',
-            email: 'dr.arunk@heartcare.com',
-            image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'
-        },
-        {
-            id: 2,
-            name: 'Dr. Anjali Singh',
-            specialty: 'General Practitioner',
-            hospital: 'City Medical Plaza',
-            phone: '+1 (555) 987-6543',
-            email: 'dr.anjali@citymed.com',
-            image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300'
-        },
-        {
-            id: 3,
-            name: 'Dr. Ravi Verma',
-            specialty: 'Endocrinologist',
-            hospital: 'General Hospital',
-            phone: '+1 (555) 456-7890',
-            email: 'dr.ravi@hospital.com',
-            image: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&q=80&w=300&h=300'
-        }
-    ];
+type Doctor = {
+    _id?: string;
+    id?: string | number;
+    name: string;
+    specialization: string;
+    hospital: string;
+    phone: string;
+    email: string;
+    bio?: string | null;
+    image?: string;
+};
+
+function Doctors() {
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+    useEffect(() => {
+        const loadDoctors = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/doctors`);
+                const data = await response.json();
+
+                if (response.ok && Array.isArray(data)) {
+                    setDoctors(data);
+                }
+            } catch (error) {
+                console.error('Failed to load doctors:', error);
+            }
+        };
+
+        loadDoctors();
+    }, []);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
@@ -52,12 +55,12 @@ function Doctors() {
                         <div key={doc.id} className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition-all group">
                             <div className="flex flex-col items-center text-center">
                                 <img
-                                    src={doc.image}
+                                    src={doc.image || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300'}
                                     alt={doc.name}
                                     className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-slate-50 dark:border-slate-700 group-hover:border-cyan-100 dark:group-hover:border-cyan-900/50 transition-colors"
                                 />
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">{doc.name}</h3>
-                                <p className="text-cyan-600 dark:text-cyan-400 font-medium text-sm mb-1">{doc.specialty}</p>
+                                <p className="text-cyan-600 dark:text-cyan-400 font-medium text-sm mb-1">{doc.specialization}</p>
                                 <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">{doc.hospital}</p>
 
                                 <div className="w-full space-y-3">

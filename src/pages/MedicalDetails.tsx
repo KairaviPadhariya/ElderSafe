@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, Heart, Scale, Thermometer, User, Save, Clipboard } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 function MedicalDetails() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         age: '',
         gender: '',
@@ -42,14 +45,57 @@ function MedicalDetails() {
         }
     }, [formData.height, formData.weight]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Mock save delay
-        setTimeout(() => {
+        setError('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const name = localStorage.getItem('userName') || 'Patient';
+
+            if (!token) {
+                throw new Error('Please log in again to continue.');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/patients`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name,
+                    age: Number(formData.age),
+                    gender: formData.gender,
+                    height: Number(formData.height),
+                    weight: Number(formData.weight),
+                    bmi: formData.bmi ? Number(formData.bmi) : null,
+                    blood_group: formData.bloodGroup,
+                    o2_saturation: Number(formData.o2Saturation),
+                    heart_rate: Number(formData.heartRate),
+                    sbp: Number(formData.sbp),
+                    dbp: Number(formData.dbp),
+                    fbs: formData.fbs ? Number(formData.fbs) : null,
+                    ppbs: formData.ppbs ? Number(formData.ppbs) : null,
+                    cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
+                })
+            });
+
+            const responseText = await response.text();
+            const responseData = responseText ? JSON.parse(responseText) : null;
+
+            if (!response.ok) {
+                throw new Error(responseData?.detail || 'Failed to save medical details.');
+            }
+
             setLoading(false);
-            navigate('/');
-        }, 1500);
+            navigate('/dashboard');
+        } catch (submitError) {
+            console.error('Failed to save medical details:', submitError);
+            setLoading(false);
+            setError(submitError instanceof Error ? submitError.message : 'Unable to save medical details.');
+        }
     };
 
     return (
@@ -68,6 +114,11 @@ function MedicalDetails() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-8 sm:p-12">
+                        {error && (
+                            <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                {error}
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {/* Personal Information */}
                             <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2">
@@ -288,7 +339,7 @@ function MedicalDetails() {
                         <div className="mt-12 flex items-center justify-end gap-4">
                             <button
                                 type="button"
-                                onClick={() => navigate('/')}
+                                onClick={() => navigate('/dashboard')}
                                 className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                                 disabled={loading}
                             >
