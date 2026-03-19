@@ -33,10 +33,13 @@ const handleLogin = async (e: React.FormEvent) => {
     const data = await response.json();
 
     if (response.ok && data.access_token) {
+      const fallbackUserName = email.split("@")[0] || email || "User";
 
       // Save token
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("userName", fallbackUserName);
+      localStorage.setItem("userEmail", email);
 
       // Decode JWT
       const decoded = decodeJWT(data.access_token);
@@ -58,14 +61,25 @@ const handleLogin = async (e: React.FormEvent) => {
 
               console.log("User API response:", userData);
 
-              localStorage.setItem(
-                "userName",
-                 userData.name || userData.full_name || userData.username || "User"
-             );
-        }
+              const resolvedUserName =
+                userData.name ||
+                userData.full_name ||
+                userData.username ||
+                userData.email?.split("@")[0] ||
+                email.split("@")[0] ||
+                email ||
+                "User";
 
+              localStorage.setItem("userName", resolvedUserName);
+              if (userData.email) {
+                localStorage.setItem("userEmail", userData.email);
+              }
+        } else {
+              console.warn("Failed to fetch user data:", userResponse.status);
+        }
       } catch (userError) {
         console.error("Failed to fetch user data:", userError);
+        localStorage.setItem("userName", fallbackUserName);
       }
 
       // Remember email

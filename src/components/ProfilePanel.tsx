@@ -8,8 +8,40 @@ interface ProfilePanelProps {
   role: string;
 }
 
+type StoredProfile = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+};
+
 function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
   const navigate = useNavigate();
+  const loggedInUserName = localStorage.getItem('userName') || 'User';
+  const loggedInUserEmail = localStorage.getItem('userEmail') || '';
+  const userProfileKey = useMemo(() => {
+    const userIdentifier = (loggedInUserEmail || loggedInUserName || role)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_');
+
+    return `profile_${role}_${userIdentifier}`;
+  }, [loggedInUserEmail, loggedInUserName, role]);
+  const legacyProfileKey = `profile_${role}`;
+  const storedProfile =
+    localStorage.getItem(userProfileKey) ?? localStorage.getItem(legacyProfileKey);
+  const parsedStoredProfile = useMemo<StoredProfile>(() => {
+    if (!storedProfile) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(storedProfile) as StoredProfile;
+    } catch (error) {
+      console.error('Failed to parse stored profile:', error);
+      return {};
+    }
+  }, [storedProfile]);
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: '',
@@ -20,6 +52,8 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userEmail');
     onClose();
     navigate('/login');
   };
@@ -56,11 +90,11 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
         };
       default: // patient
         return {
-          name: 'Savitri Devi',
+          name: parsedStoredProfile.name || loggedInUserName,
           role: 'Patient',
-          email: 'savitri.devi@email.com',
-          phone: '+1 (555) 123-4567',
-          address: '123 Oak Street, Springfield, IL 62701',
+          email: parsedStoredProfile.email || loggedInUserEmail || 'Not provided',
+          phone: parsedStoredProfile.phone || 'Not provided',
+          address: parsedStoredProfile.address || 'Not provided',
           details: {
             'Blood Type': 'O+',
             'DOB': '1952-05-15',
@@ -71,7 +105,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           }
         };
     }
-  }, [role]);
+  }, [loggedInUserEmail, loggedInUserName, parsedStoredProfile, role]);
 
   const [displayProfile, setDisplayProfile] = useState(initialProfile);
 
@@ -90,6 +124,14 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
   };
 
   const handleSaveProfile = () => {
+    localStorage.setItem('userName', editFormData.name);
+    localStorage.setItem('userEmail', editFormData.email);
+    localStorage.setItem(userProfileKey, JSON.stringify({
+      name: editFormData.name,
+      email: editFormData.email,
+      phone: editFormData.phone,
+      address: editFormData.address,
+    }));
     setDisplayProfile(prev => ({
       ...prev,
       name: editFormData.name,
