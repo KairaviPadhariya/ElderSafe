@@ -1,12 +1,10 @@
-import { Calendar, Clock, MapPin, Plus, Edit2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, Edit2, Stethoscope } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import BackButton from '../components/BackButton';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 const REQUEST_TIMEOUT_MS = 12000;
-const placeholderImage = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300';
-
 type Appointment = {
     _id?: string;
     id?: string | number;
@@ -499,11 +497,9 @@ function Appointments() {
                                 </div>
                             ) : (
                                 <div key={appointmentId} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:shadow-md transition-shadow">
-                                    <img
-                                        src={apt.image || placeholderImage}
-                                        alt={doctorName}
-                                        className="w-20 h-20 rounded-2xl object-cover"
-                                    />
+                                    <div className="w-20 h-20 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/30">
+                                        <Stethoscope className="w-9 h-9 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                                    </div>
                                     <div className="flex-1">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{doctorName}</h3>
