@@ -272,14 +272,11 @@ function FamilyDashboard({ userName }: Props) {
                         <AlertCircle className="w-5 h-5" /> Emergency
                     </h3>
                     <p className="text-rose-600/80 dark:text-rose-300/60 text-sm mb-4">
-                        Quick access to emergency support and the linked family contact.
+                        Quick access to emergency support.
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                         <button className="bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 py-2 px-3 rounded-xl text-sm font-semibold shadow-sm border border-rose-100 dark:border-rose-900 flex items-center justify-center gap-2">
                             <Phone className="w-4 h-4" /> 102
-                        </button>
-                        <button className="bg-rose-600 text-white py-2 px-3 rounded-xl text-sm font-semibold shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-                            <Phone className="w-4 h-4" /> {familyRecord?.name || 'Family'}
                         </button>
                     </div>
                 </div>
@@ -361,11 +358,6 @@ function FamilyDashboard({ userName }: Props) {
                             </div>
                         </div>
                     </div>
-
-                    <button className="w-full py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        Call Patient Contact
-                    </button>
 
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
                         <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
