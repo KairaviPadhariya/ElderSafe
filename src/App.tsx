@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import MedicalDetails from './pages/MedicalDetails';
 import DoctorDetails from './pages/DoctorDetails';
+import FamilyDetails from './pages/FamilyDetails';
 import Appointments from './pages/Appointments';
 import DailyLogs from './pages/DailyLogs';
 import HealthTrends from './pages/HealthTrends';
@@ -76,6 +77,7 @@ function App() {
 
               <Route path="/medical-details" element={<MedicalDetails />} />
               <Route path="/doctor-details" element={<DoctorDetails />} />
+              <Route path="/family-details" element={<FamilyDetails />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/daily-logs" element={<DailyLogs />} />
               <Route path="/health-trends" element={<HealthTrends />} />
