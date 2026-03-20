@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HeartHandshake, ShieldCheck, UserRound, Phone, MapPin, Save } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
+type Patient = {
+    _id: string;
+    name?: string;
+};
+
 function FamilyDetails() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [patientsLoading, setPatientsLoading] = useState(true);
+    const [patients, setPatients] = useState<Patient[]>([]);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
+        patientId: '',
         patientName: '',
         relation: '',
         accessLevel: 'Full Access',
@@ -21,6 +29,41 @@ function FamilyDetails() {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
+
+    useEffect(() => {
+        const loadPatients = async () => {
+            try {
+                const token = localStorage.getItem('token');
+
+                if (!token) {
+                    setPatients([]);
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/patients`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const responseText = await response.text();
+                const responseData = responseText ? JSON.parse(responseText) : [];
+
+                if (!response.ok) {
+                    throw new Error(responseData?.detail || 'Failed to load patients.');
+                }
+
+                setPatients(Array.isArray(responseData) ? responseData : []);
+            } catch (loadError) {
+                console.error('Failed to load patients:', loadError);
+                setPatients([]);
+            } finally {
+                setPatientsLoading(false);
+            }
+        };
+
+        loadPatients();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,6 +88,7 @@ function FamilyDetails() {
                 body: JSON.stringify({
                     name,
                     email,
+                    patient_id: formData.patientId || null,
                     patient_name: formData.patientName,
                     relation: formData.relation,
                     access_level: formData.accessLevel,
@@ -101,15 +145,29 @@ function FamilyDetails() {
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient Name</label>
-                                <input
-                                    type="text"
-                                    name="patientName"
+                                <select
                                     required
-                                    value={formData.patientName}
-                                    onChange={handleChange}
-                                    placeholder="Savitri Devi"
+                                    value={formData.patientId}
+                                    onChange={(e) => {
+                                        const selectedPatient = patients.find((patient) => patient._id === e.target.value);
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            patientId: e.target.value,
+                                            patientName: selectedPatient?.name || ''
+                                        }));
+                                    }}
                                     className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none"
-                                />
+                                    disabled={patientsLoading || patients.length === 0}
+                                >
+                                    <option value="">
+                                        {patientsLoading ? 'Loading patients...' : patients.length === 0 ? 'No patients found' : 'Select patient'}
+                                    </option>
+                                    {patients.map((patient) => (
+                                        <option key={patient._id} value={patient._id}>
+                                            {patient.name || 'Unnamed Patient'}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className="space-y-2">

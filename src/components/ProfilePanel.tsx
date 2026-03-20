@@ -61,6 +61,7 @@ type PatientRecord = {
 type FamilyRecord = {
   name?: string;
   email?: string;
+  patient_id?: string;
   patient_name?: string;
   relation?: string;
   access_level?: string;
@@ -489,6 +490,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           body: JSON.stringify({
             name: editFormData.name,
             email: editFormData.email,
+            patient_id: familyRecord.patient_id || null,
             patient_name: familyRecord.patient_name || '',
             relation: familyRecord.relation || '',
             access_level: familyRecord.access_level || 'Full Access',
