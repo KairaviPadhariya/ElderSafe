@@ -21,7 +21,15 @@ type Appointment = {
     image?: string;
 };
 
+type Doctor = {
+    _id: string;
+    name?: string;
+    specialization?: string;
+    hospital?: string;
+};
+
 type AppointmentFormState = {
+    doctorId: string;
     doctor: string;
     specialty: string;
     date: string;
@@ -45,6 +53,7 @@ function getCurrentTime() {
 
 function createEmptyFormState(): AppointmentFormState {
     return {
+        doctorId: '',
         doctor: '',
         specialty: '',
         date: '',
@@ -84,6 +93,7 @@ async function requestJson(url: string, options: RequestInit = {}) {
 
 function Appointments() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [isAdding, setIsAdding] = useState(false);
     const [isRescheduling, setIsRescheduling] = useState<string | number | null>(null);
     const [appointmentToDelete, setAppointmentToDelete] = useState<string | number | null>(null);
@@ -123,9 +133,20 @@ function Appointments() {
         }
     }, []);
 
+    const loadDoctors = useCallback(async () => {
+        try {
+            const data = await requestJson(`${API_BASE_URL}/doctors`);
+            setDoctors(Array.isArray(data) ? data : []);
+        } catch (loadError) {
+            console.error('Failed to load doctors:', loadError);
+            setDoctors([]);
+        }
+    }, []);
+
     useEffect(() => {
         loadAppointments();
-    }, [loadAppointments]);
+        loadDoctors();
+    }, [loadAppointments, loadDoctors]);
 
     const getMinTime = (selectedDate: string) => {
         if (!selectedDate) {
@@ -159,6 +180,7 @@ function Appointments() {
                     Authorization: `Bearer ${token}`
                 },
                 body: JSON.stringify({
+                    doctor_id: newAppointment.doctorId,
                     doctor_name: newAppointment.doctor,
                     specialty: newAppointment.specialty,
                     date: newAppointment.date,
@@ -266,6 +288,18 @@ function Appointments() {
         setRescheduleData({ date: appointment.date, time: appointment.time });
     };
 
+    const handleDoctorChange = (doctorId: string) => {
+        const selectedDoctor = doctors.find((doctor) => doctor._id === doctorId);
+
+        setNewAppointment((current) => ({
+            ...current,
+            doctorId,
+            doctor: selectedDoctor?.name || '',
+            specialty: selectedDoctor?.specialization || '',
+            location: selectedDoctor?.hospital || ''
+        }));
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
@@ -336,19 +370,24 @@ function Appointments() {
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Add New Appointment</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <input
-                                type="text"
-                                placeholder="Doctor Name"
+                            <select
                                 className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={newAppointment.doctor}
-                                onChange={(e) => setNewAppointment({ ...newAppointment, doctor: e.target.value })}
-                            />
+                                value={newAppointment.doctorId}
+                                onChange={(e) => handleDoctorChange(e.target.value)}
+                            >
+                                <option value="">Select Doctor</option>
+                                {doctors.map((doctor) => (
+                                    <option key={doctor._id} value={doctor._id}>
+                                        {doctor.name || 'Unnamed Doctor'}
+                                    </option>
+                                ))}
+                            </select>
                             <input
                                 type="text"
                                 placeholder="Specialty"
                                 className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={newAppointment.specialty}
-                                onChange={(e) => setNewAppointment({ ...newAppointment, specialty: e.target.value })}
+                                readOnly
                             />
                             <input
                                 type="date"
@@ -373,7 +412,7 @@ function Appointments() {
                                 placeholder="Location"
                                 className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:col-span-2"
                                 value={newAppointment.location}
-                                onChange={(e) => setNewAppointment({ ...newAppointment, location: e.target.value })}
+                                readOnly
                             />
                         </div>
                         <div className="flex gap-2 mt-4">
