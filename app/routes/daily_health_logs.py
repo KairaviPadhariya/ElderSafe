@@ -18,13 +18,28 @@ def serialize_health_log(log: dict):
     return log
 
 
+async def resolve_patient_id(current_user: dict) -> str:
+    if current_user.get("role") != "family":
+        return current_user["sub"]
+
+    family_record = await database.family.find_one({"user_id": current_user["sub"]})
+
+    if not family_record or not family_record.get("patient_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="Complete the family profile first to link a patient."
+        )
+
+    return str(family_record["patient_id"])
+
+
 @router.post("/daily_health_logs")
 async def create_health_log(
     log: DailyHealthLogCreate,
     current_user: dict = Depends(verify_token)
 ):
     log_dict = log.dict(exclude_none=True)
-    patient_id = current_user["sub"]
+    patient_id = await resolve_patient_id(current_user)
     now = datetime.utcnow()
 
     update_fields = {
@@ -67,7 +82,7 @@ async def get_health_logs(
     log_date: str | None = Query(default=None),
     current_user: dict = Depends(verify_token)
 ):
-    patient_id = current_user["sub"]
+    patient_id = await resolve_patient_id(current_user)
     query = {"patient_id": patient_id}
 
     if log_date:

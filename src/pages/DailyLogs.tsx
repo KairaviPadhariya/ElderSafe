@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Activity, Heart, Droplets } from 'lucide-react';
+import { Save, Activity, Heart, Droplets, FileText } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
 
@@ -29,6 +29,11 @@ type DailyLogResponse = {
     weight?: number;
     temperature?: number;
     notes?: string;
+};
+
+type FamilyRecord = {
+    patient_id?: string;
+    patient_name?: string;
 };
 
 function createEmptyFormState(): DailyLogFormState {
@@ -82,11 +87,15 @@ async function requestJson(url: string, options: RequestInit = {}) {
 
 function DailyLogs() {
     const navigate = useNavigate();
+    const role = localStorage.getItem('userRole') || 'patient';
+    const isFamilyView = role === 'family';
     const [formData, setFormData] = useState<DailyLogFormState>(createEmptyFormState());
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [linkedPatientName, setLinkedPatientName] = useState('');
+    const [dailyEntries, setDailyEntries] = useState<DailyLogResponse[]>([]);
     const todayDate = getTodayDate();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -97,23 +106,44 @@ function DailyLogs() {
         }));
     };
 
-    const loadTodayLog = useCallback(async () => {
+    const loadLogs = useCallback(async () => {
         const token = localStorage.getItem('token');
 
         if (!token) {
-            setError('Please log in again to manage your daily health log.');
+            setError(isFamilyView ? 'Please log in again to manage the patient daily log.' : 'Please log in again to manage your daily health log.');
             setInitialLoading(false);
             return;
         }
 
         try {
-            const data = await requestJson(`${API_BASE_URL}/daily_health_logs?log_date=${todayDate}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
+            let familyData: FamilyRecord | null = null;
 
-            const todayLog = Array.isArray(data) ? data[0] : null;
+            if (isFamilyView) {
+                const response = await requestJson(`${API_BASE_URL}/family/me`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                familyData = response as FamilyRecord | null;
+                setLinkedPatientName(familyData?.patient_name || '');
+            }
+
+            const [todayData, allLogsData] = await Promise.all([
+                requestJson(`${API_BASE_URL}/daily_health_logs?log_date=${todayDate}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }),
+                requestJson(`${API_BASE_URL}/daily_health_logs`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                })
+            ]);
+
+            const todayLog = Array.isArray(todayData) ? todayData[0] : null;
+            const allLogs = Array.isArray(allLogsData) ? allLogsData as DailyLogResponse[] : [];
+            setDailyEntries(allLogs);
 
             if (todayLog) {
                 const log = todayLog as DailyLogResponse;
@@ -127,18 +157,21 @@ function DailyLogs() {
                     temperature: log.temperature != null ? String(log.temperature) : '',
                     notes: log.notes ?? ''
                 });
+            } else {
+                setFormData(createEmptyFormState());
             }
+
         } catch (loadError) {
             console.error('Failed to load daily health log:', loadError);
             setError(loadError instanceof Error ? loadError.message : "Unable to load today's health log.");
         } finally {
             setInitialLoading(false);
         }
-    }, [todayDate]);
+    }, [isFamilyView, todayDate]);
 
     useEffect(() => {
-        loadTodayLog();
-    }, [loadTodayLog]);
+        loadLogs();
+    }, [loadLogs]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -148,7 +181,7 @@ function DailyLogs() {
         const token = localStorage.getItem('token');
 
         if (!token) {
-            setError('Please log in again to save your daily health log.');
+            setError(isFamilyView ? 'Please log in again to save the patient daily health log.' : 'Please log in again to save your daily health log.');
             return;
         }
 
@@ -179,7 +212,8 @@ function DailyLogs() {
                 })
             });
 
-            setSuccessMessage(`Health log saved for ${todayDate}.`);
+            setSuccessMessage(`${isFamilyView ? 'Patient' : 'Health'} log saved for ${todayDate}.`);
+            await loadLogs();
         } catch (saveError) {
             console.error('Failed to save daily health log:', saveError);
             setError(saveError instanceof Error ? saveError.message : "Unable to save today's health log.");
@@ -188,17 +222,64 @@ function DailyLogs() {
         }
     };
 
+    const pageTitle = isFamilyView ? 'View Daily Entries' : 'Daily Health Log';
+    const pageSubtitle = isFamilyView
+        ? `Review entries for ${linkedPatientName || 'the linked patient'} and update today's log below.`
+        : `Record your vitals for ${todayDate}`;
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-2xl mx-auto">
                 <BackButton />
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Daily Health Log</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Record your vitals for {todayDate}</p>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{pageTitle}</h1>
+                    <p className="text-slate-500 dark:text-slate-400">{pageSubtitle}</p>
+                </div>
+
+                <div className="mb-8 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center gap-2 mb-4">
+                        <FileText className="w-5 h-5 text-emerald-500" />
+                        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">View Daily Entries</h2>
+                    </div>
+
+                    {dailyEntries.length === 0 ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No daily log entries found yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                                <thead className="bg-slate-50 dark:bg-slate-900/40">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">BP</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Heart Rate</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Glucose</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                    {dailyEntries.map((entry) => (
+                                        <tr key={entry._id || entry.log_date} className="align-top">
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{entry.log_date}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                                {entry.systolic_bp}/{entry.diastolic_bp}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{entry.heart_rate} bpm</td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                                F: {entry.fasting_blood_glucose ?? '--'} / PP: {entry.post_prandial_glucose ?? '--'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                                {entry.notes || 'No notes'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {error && (
+                    {error && !isFamilyView && (
                         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3">
                             {error}
                         </div>
@@ -341,7 +422,7 @@ function DailyLogs() {
                     <div className="flex gap-4 pt-4">
                         <button
                             type="button"
-                            onClick={() => navigate('/')}
+                            onClick={() => navigate('/dashboard')}
                             disabled={loading}
                             className="flex-1 py-3.5 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-70"
                         >

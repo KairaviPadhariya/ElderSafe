@@ -26,8 +26,6 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
         return [
           { name: 'Dashboard', path: '/' },
           { name: 'Patient Overview', path: '/medical-details' },
-          { name: 'Daily Logs', path: '/daily-logs' },
-          { name: 'Emergency Contacts', path: '/emergency-contacts' },
           { name: 'Care Team', path: '/doctors' },
         ];
       default: // patient
