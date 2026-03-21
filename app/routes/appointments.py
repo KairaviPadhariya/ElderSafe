@@ -10,13 +10,29 @@ from app.utils.auth import verify_token
 router = APIRouter()
 
 
-def build_user_appointment_query(user_id: str):
-    return {
-        "$or": [
-            {"created_by": user_id},
-            {"patient_id": user_id}
-        ]
-    }
+async def get_doctor_profile_id(user_id: str):
+    doctor = await database.doctors.find_one({"user_id": user_id})
+
+    if not doctor:
+        return None
+
+    return str(doctor["_id"])
+
+
+async def build_user_appointment_query(current_user: dict):
+    user_id = current_user["sub"]
+    filters = [
+        {"created_by": user_id},
+        {"patient_id": user_id}
+    ]
+
+    if current_user.get("role") == "doctor":
+        doctor_profile_id = await get_doctor_profile_id(user_id)
+
+        if doctor_profile_id:
+            filters.append({"doctor_id": doctor_profile_id})
+
+    return {"$or": filters}
 
 
 def serialize_appointment(appointment: dict):
@@ -59,7 +75,7 @@ async def get_appointments(
     current_user: dict = Depends(verify_token)
 ):
     appointments = []
-    query = build_user_appointment_query(current_user["sub"])
+    query = await build_user_appointment_query(current_user)
 
     try:
         async for appointment in database.appointments.find(query).sort("date", 1):
@@ -81,7 +97,8 @@ async def update_appointment(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid appointment ID")
 
-    query = {"_id": object_id, **build_user_appointment_query(current_user["sub"])}
+    access_query = await build_user_appointment_query(current_user)
+    query = {"_id": object_id, **access_query}
     existing_appointment = await database.appointments.find_one(query)
 
     if not existing_appointment:
@@ -119,7 +136,8 @@ async def cancel_appointment(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid appointment ID")
 
-    query = {"_id": object_id, **build_user_appointment_query(current_user["sub"])}
+    access_query = await build_user_appointment_query(current_user)
+    query = {"_id": object_id, **access_query}
     existing_appointment = await database.appointments.find_one(query)
 
     if not existing_appointment:
@@ -134,3 +152,63 @@ async def cancel_appointment(
         raise HTTPException(status_code=404, detail="Appointment not found")
 
     return {"message": "Appointment deleted successfully"}
+
+
+@router.get("/doctors/dashboard")
+async def get_doctor_dashboard(current_user: dict = Depends(verify_token)):
+    if current_user.get("role") != "doctor":
+        raise HTTPException(status_code=403, detail="Only doctors can access this dashboard")
+
+    doctor = await database.doctors.find_one({"user_id": current_user["sub"]})
+
+    if not doctor:
+        return {
+            "total_patients": 0,
+            "total_appointments": 0,
+            "appointments_today": 0,
+            "schedule": []
+        }
+
+    doctor_id = str(doctor["_id"])
+    appointments = []
+    patient_ids = set()
+
+    try:
+        async for appointment in database.appointments.find({"doctor_id": doctor_id}).sort([
+            ("date", 1),
+            ("time", 1)
+        ]):
+            serialized = serialize_appointment(appointment)
+            patient_id = serialized.get("patient_id")
+
+            if patient_id:
+                patient_ids.add(patient_id)
+
+                patient_user = None
+
+                if ObjectId.is_valid(patient_id):
+                    patient_user = await database.users.find_one({"_id": ObjectId(patient_id)})
+
+                patient_profile = await database.patients.find_one({"user_id": patient_id})
+
+                serialized["patient_name"] = (
+                    (patient_profile or {}).get("name")
+                    or (patient_user or {}).get("name")
+                    or "Patient"
+                )
+            else:
+                serialized["patient_name"] = "Patient"
+
+            appointments.append(serialized)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load doctor dashboard: {exc}")
+
+    today_string = datetime.utcnow().date().isoformat()
+    appointments_today = sum(1 for appointment in appointments if appointment.get("date") == today_string)
+
+    return {
+        "total_patients": len(patient_ids),
+        "total_appointments": len(appointments),
+        "appointments_today": appointments_today,
+        "schedule": appointments
+    }

@@ -1,95 +1,229 @@
 import {
-  Users,
   Calendar,
+  Clock,
+  Users,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
   userName?: string;
 }
 
+interface DashboardAppointment {
+  _id: string;
+  patient_id?: string;
+  patient_name?: string;
+  date: string;
+  time: string;
+  reason?: string;
+  location?: string;
+  status?: string;
+}
+
+interface DoctorDashboardData {
+  total_patients: number;
+  total_appointments: number;
+  appointments_today: number;
+  schedule: DashboardAppointment[];
+}
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
+const REQUEST_TIMEOUT_MS = 12000;
+
+const emptyDashboard: DoctorDashboardData = {
+  total_patients: 0,
+  total_appointments: 0,
+  appointments_today: 0,
+  schedule: []
+};
+
+async function requestJson(url: string, options: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      throw new Error(data?.detail || data?.message || 'Request failed');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check that the backend and database are running.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function formatAppointmentDate(date: string) {
+  if (!date) {
+    return 'Date not set';
+  }
+
+  const parsed = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function getPatientInitials(name?: string) {
+  return (name || 'Patient')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'PT';
+}
+
 function DoctorDashboard({ userName }: Props) {
-  const [name, setName] = useState("Doctor");
+  const [name, setName] = useState('Doctor');
+  const [dashboard, setDashboard] = useState<DoctorDashboardData>(emptyDashboard);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (userName) {
       setName(userName);
-    } else {
-      const storedName = localStorage.getItem("userName");
-      if (storedName) setName(storedName);
+      return;
+    }
+
+    const storedName = localStorage.getItem('userName');
+    if (storedName) {
+      setName(storedName);
     }
   }, [userName]);
 
-  const todayString = new Date().toISOString().slice(0, 10);
+  const loadDashboard = useCallback(async () => {
+    const token = localStorage.getItem('token');
 
-  const [appointments, setAppointments] = useState([
-    { id: 1, name: 'Janvi Patel', details: 'Routine Checkup', reason: 'Regular check-up', time: '10:00 AM', initials: 'JP', date: todayString },
-    { id: 2, name: 'Robert Fox', details: 'Blood Pressure Check', reason: 'Hypertension follow-up', time: '11:30 AM', initials: 'RF', date: todayString },
-    { id: 3, name: 'Esther Howard', details: 'Consultation', reason: 'Discuss lab results', time: '02:00 PM', initials: 'EH', date: todayString },
-    { id: 4, name: 'Old Patient', details: 'Follow-up', reason: 'Prescription refill', time: '09:00 AM', initials: 'OP', date: '2000-01-01' },
-  ]);
+    if (!token) {
+      setError('Please log in again to view your dashboard.');
+      setLoading(false);
+      return;
+    }
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [newAppointment, setNewAppointment] = useState({ name: '', details: '', reason: '', time: '' });
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editTime, setEditTime] = useState('');
-  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
+    try {
+      const data = await requestJson(`${API_BASE_URL}/doctors/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-  const stats = [
-    { title: 'Total Patients', value: '23', icon: Users, color: 'bg-blue-500' },
-    { title: 'Appointments Today', value: appointments.filter(app => app.date === todayString).length.toString(), icon: Calendar, color: 'bg-emerald-500' },
-  ];
+      setDashboard({
+        total_patients: data?.total_patients ?? 0,
+        total_appointments: data?.total_appointments ?? 0,
+        appointments_today: data?.appointments_today ?? 0,
+        schedule: Array.isArray(data?.schedule) ? data.schedule : []
+      });
+      setError('');
+    } catch (loadError) {
+      console.error('Failed to load doctor dashboard:', loadError);
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load dashboard data.');
+      setDashboard(emptyDashboard);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleAddAppointment = () => {
-    if (newAppointment.name && newAppointment.time) {
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
-      const initials = newAppointment.name
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .substring(0, 2);
+  const stats = useMemo(() => ([
+    { title: 'Total Patients', value: dashboard.total_patients.toString(), icon: Users, color: 'bg-blue-500' },
+    { title: 'Total Appointments', value: dashboard.total_appointments.toString(), icon: Calendar, color: 'bg-cyan-500' },
+    { title: 'Appointments Today', value: dashboard.appointments_today.toString(), icon: Clock, color: 'bg-emerald-500' },
+  ]), [dashboard]);
 
-      setAppointments([
-        ...appointments,
-        { ...newAppointment, id: Date.now(), initials, date: todayString }
-      ]);
+  const handleReschedule = async (id: string) => {
+    if (!editDate || !editTime) {
+      setError('Both date and time are required to reschedule an appointment.');
+      return;
+    }
 
-      setNewAppointment({ name: '', details: '', reason: '', time: '' });
-      setIsAdding(false);
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      setError('Please log in again to update the appointment.');
+      return;
+    }
+
+    setSavingId(id);
+
+    try {
+      await requestJson(`${API_BASE_URL}/appointments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: editDate,
+          time: editTime
+        })
+      });
+
+      setEditingId(null);
+      setEditDate('');
+      setEditTime('');
+      setError('');
+      await loadDashboard();
+    } catch (saveError) {
+      console.error('Failed to reschedule appointment:', saveError);
+      setError(saveError instanceof Error ? saveError.message : 'Unable to reschedule the appointment.');
+    } finally {
+      setSavingId(null);
     }
   };
 
-  const handleReschedule = (id: number) => {
-    setAppointments(
-      appointments.map(app =>
-        app.id === id ? { ...app, time: editTime } : app
-      )
-    );
-
-    setEditingId(null);
-    setEditTime('');
-  };
-
-  const startReschedule = (appointment: any) => {
-    setEditingId(appointment.id);
+  const startReschedule = (appointment: DashboardAppointment) => {
+    setEditingId(appointment._id);
+    setEditDate(appointment.date);
     setEditTime(appointment.time);
+    setError('');
   };
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
       <div className="mb-10">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
           Welcome back, Dr. {name}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
-          Here is your daily overview
+          Here is your live schedule and patient overview
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+      {error && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
 
@@ -99,7 +233,7 @@ function DoctorDashboard({ userName }: Props) {
                 <div>
                   <p className="text-slate-500 text-sm mb-1">{stat.title}</p>
                   <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-                    {stat.value}
+                    {loading ? '...' : stat.value}
                   </h3>
                 </div>
 
@@ -112,110 +246,95 @@ function DoctorDashboard({ userName }: Props) {
         })}
       </div>
 
-      {/* Appointments */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border overflow-hidden">
-
         <div className="p-6 border-b">
-          <div className="flex justify-between items-center">
-
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Appointments Today
-            </h3>
-
-            <button
-              onClick={() => setIsAdding(!isAdding)}
-              className="text-emerald-600 text-sm font-medium hover:underline"
-            >
-              {isAdding ? 'Cancel' : '+ Add Appointment'}
-            </button>
-
-          </div>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+            Appointment Schedule
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Upcoming and recorded appointments linked to your doctor profile
+          </p>
         </div>
 
-        {isAdding && (
-          <div className="p-6 border-b bg-slate-50 dark:bg-slate-800">
-
-            <div className="flex gap-4 flex-wrap">
-
-              <input
-                type="text"
-                placeholder="Patient Name"
-                className="border rounded-lg p-2 flex-1"
-                value={newAppointment.name}
-                onChange={(e) =>
-                  setNewAppointment({ ...newAppointment, name: e.target.value })
-                }
-              />
-
-              <input
-                type="text"
-                placeholder="Details"
-                className="border rounded-lg p-2 flex-1"
-                value={newAppointment.details}
-                onChange={(e) =>
-                  setNewAppointment({ ...newAppointment, details: e.target.value })
-                }
-              />
-
-              <input
-                type="text"
-                placeholder="Time"
-                className="border rounded-lg p-2 w-40"
-                value={newAppointment.time}
-                onChange={(e) =>
-                  setNewAppointment({ ...newAppointment, time: e.target.value })
-                }
-              />
-
-              <button
-                onClick={handleAddAppointment}
-                className="bg-emerald-500 text-white px-4 py-2 rounded-lg"
-              >
-                Add
-              </button>
-
-            </div>
+        {loading ? (
+          <div className="p-6 text-slate-500 dark:text-slate-400">
+            Loading dashboard data...
           </div>
-        )}
-
-        <div className="divide-y">
-
-          {appointments
-            .filter(app => app.date === todayString)
-            .map((appointment) => (
-
-              <div key={appointment.id} className="p-6 flex justify-between items-center">
-
+        ) : dashboard.schedule.length === 0 ? (
+          <div className="p-6 text-slate-500 dark:text-slate-400">
+            No appointments have been scheduled yet.
+          </div>
+        ) : (
+          <div className="divide-y">
+            {dashboard.schedule.map((appointment) => (
+              <div key={appointment._id} className="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4">
-
-                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold">
-                    {appointment.initials}
+                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-100">
+                    {getPatientInitials(appointment.patient_name)}
                   </div>
 
                   <div>
-                    <h4 className="font-semibold">{appointment.name}</h4>
-                    <p className="text-sm text-slate-500">
-                      {appointment.details} • {appointment.time}
+                    <h4 className="font-semibold text-slate-900 dark:text-white">
+                      {appointment.patient_name || 'Patient'}
+                    </h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {(appointment.reason || 'General consultation')} | {formatAppointmentDate(appointment.date)} | {appointment.time}
                     </p>
+                    {appointment.location && (
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                        {appointment.location}
+                      </p>
+                    )}
                   </div>
-
                 </div>
 
-                <button
-                  onClick={() => startReschedule(appointment)}
-                  className="px-4 py-2 bg-slate-100 rounded-lg text-sm"
-                >
-                  Reschedule
-                </button>
-
+                {editingId === appointment._id ? (
+                  <div className="flex flex-col sm:flex-row gap-3 lg:items-center">
+                    <input
+                      type="date"
+                      className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                      value={editDate}
+                      onChange={(event) => setEditDate(event.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                      value={editTime}
+                      onChange={(event) => setEditTime(event.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReschedule(appointment._id)}
+                        disabled={savingId === appointment._id}
+                        className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm disabled:opacity-70"
+                      >
+                        {savingId === appointment._id ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditDate('');
+                          setEditTime('');
+                        }}
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startReschedule(appointment)}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
+                  >
+                    Reschedule
+                  </button>
+                )}
               </div>
-
             ))}
-
-        </div>
-
+          </div>
+        )}
       </div>
-
     </main>
   );
 }

@@ -90,6 +90,8 @@ async function requestJson(url: string, options: RequestInit = {}) {
 }
 
 function Appointments() {
+    const role = localStorage.getItem('userRole') || 'patient';
+    const canCreateAppointments = role !== 'doctor';
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [isAdding, setIsAdding] = useState(false);
@@ -143,8 +145,10 @@ function Appointments() {
 
     useEffect(() => {
         loadAppointments();
-        loadDoctors();
-    }, [loadAppointments, loadDoctors]);
+        if (canCreateAppointments) {
+            loadDoctors();
+        }
+    }, [canCreateAppointments, loadAppointments, loadDoctors]);
 
     const getMinTime = (selectedDate: string) => {
         if (!selectedDate) {
@@ -307,16 +311,18 @@ function Appointments() {
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">My Appointments</h1>
                         <p className="text-slate-500 dark:text-slate-400">Manage your visits and schedules</p>
                     </div>
-                    <button
-                        onClick={() => {
-                            setError('');
-                            setIsAdding(!isAdding);
-                        }}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span className="hidden sm:inline">New Appointment</span>
-                    </button>
+                    {canCreateAppointments && (
+                        <button
+                            onClick={() => {
+                                setError('');
+                                setIsAdding(!isAdding);
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span className="hidden sm:inline">New Appointment</span>
+                        </button>
+                    )}
                 </div>
 
                 {error && (
@@ -364,7 +370,7 @@ function Appointments() {
                     </div>
                 )}
 
-                {isAdding && (
+                {canCreateAppointments && isAdding && (
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Add New Appointment</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

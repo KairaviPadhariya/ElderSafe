@@ -235,7 +235,7 @@ function FamilyDashboard({ userName }: Props) {
                         Welcome, {name}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-lg">
-                        Monitoring status for:{' '}
+                        Monitoring status for:{ }
                         <span className="font-semibold text-slate-900 dark:text-white">
                             {patientName}
                         </span>
