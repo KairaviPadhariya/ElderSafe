@@ -1,4 +1,5 @@
 import { Bell, User, Heart, Sun, Moon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { Link } from 'react-router-dom';
 
@@ -8,27 +9,78 @@ interface HeaderProps {
   onProfileClick: () => void;
 }
 
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
-  const notificationCount = 3;
+  const [notificationCount, setNotificationCount] = useState(0);
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      setNotificationCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/notifications`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load notifications');
+        }
+
+        const data = await response.json();
+
+        if (isMounted) {
+          setNotificationCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setNotificationCount(0);
+        }
+      }
+    };
+
+    const syncNotifications = () => {
+      fetchNotifications();
+    };
+
+    fetchNotifications();
+    window.addEventListener('focus', syncNotifications);
+    window.addEventListener('notifications-updated', syncNotifications);
+    const intervalId = window.setInterval(fetchNotifications, 60000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('focus', syncNotifications);
+      window.removeEventListener('notifications-updated', syncNotifications);
+      window.clearInterval(intervalId);
+    };
+  }, [role]);
 
   const getNavLinks = () => {
     switch (role) {
       case 'doctor':
-        // Doctor-specific navigation items (simplified)
         return [
           { name: 'Dashboard', path: '/' },
           { name: 'My Patients', path: '/patients' },
           { name: 'Appointments', path: '/appointments' },
         ];
       case 'family':
-        // Family-specific navigation: focus on caregiving and quick access
         return [
           { name: 'Dashboard', path: '/' },
           { name: 'Patient Overview', path: '/medical-details' },
           { name: 'Care Team', path: '/doctors' },
         ];
-      default: // patient
+      default:
         return [
           { name: 'Dashboard', path: '/' },
           { name: 'Medical Details', path: '/medical-details' },
@@ -52,7 +104,6 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
             </Link>
           </div>
 
-          {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
               <Link
@@ -85,8 +136,8 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
             >
               <Bell className="w-6 h-6" />
               {notificationCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm">
-                  {notificationCount}
+                <span className="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm">
+                  {notificationCount > 9 ? '9+' : notificationCount}
                 </span>
               )}
             </button>
