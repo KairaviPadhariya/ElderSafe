@@ -28,17 +28,6 @@ type ProfileData = {
   } | null;
 };
 
-type DoctorRecord = {
-  name?: string;
-  email?: string;
-  specialization?: string;
-  phone?: string | null;
-  hospital?: string | null;
-  license_no?: string | null;
-  experience_years?: number | null;
-  bio?: string | null;
-};
-
 type PatientRecord = {
   name?: string;
   age?: number;
@@ -152,7 +141,6 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     }
   }, [storedProfile]);
   const [isEditing, setIsEditing] = useState(false);
-  const [doctorRecord, setDoctorRecord] = useState<DoctorRecord | null>(null);
   const [patientRecord, setPatientRecord] = useState<PatientRecord | null>(null);
   const [familyRecord, setFamilyRecord] = useState<FamilyRecord | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -210,7 +198,6 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           return;
         }
 
-        setDoctorRecord(doctorData);
         setDisplayProfile({
           name: doctorData.name || loggedInUserName,
           role: doctorData.specialization || 'Doctor',
@@ -391,19 +378,6 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           throw new Error(responseData?.detail || 'Failed to update doctor profile.');
         }
 
-        setDoctorRecord((prev) => ({
-          ...(prev ?? {}),
-          name: editFormData.name,
-          email: editFormData.email,
-          phone: editFormData.phone,
-          hospital: editFormData.address,
-          specialization: editFormData.specialization || 'Doctor',
-          license_no: editFormData.licenseNo || null,
-          experience_years: editFormData.experienceYears
-            ? Number.parseInt(editFormData.experienceYears, 10) || null
-            : null,
-          bio: editFormData.bio || null,
-        }));
       } catch (error) {
         console.error('Failed to save doctor profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update doctor profile.');

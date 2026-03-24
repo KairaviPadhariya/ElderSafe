@@ -49,6 +49,13 @@ type PatientRecord = {
     address?: string | null;
 };
 
+type SOSAlert = {
+    _id: string;
+    location?: string | null;
+    status?: string;
+    created_at?: string;
+};
+
 async function requestJson(url: string, options: RequestInit = {}) {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -115,11 +122,30 @@ function getVitalsStatus(patient: PatientRecord | null) {
     };
 }
 
+function formatSosTime(timestamp?: string) {
+    if (!timestamp) {
+        return 'just now';
+    }
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+        return 'recently';
+    }
+
+    return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+}
+
 function FamilyDashboard({ userName }: Props) {
     const navigate = useNavigate();
     const [name, setName] = useState('User');
     const [familyRecord, setFamilyRecord] = useState<FamilyRecord | null>(null);
     const [linkedPatient, setLinkedPatient] = useState<PatientRecord | null>(null);
+    const [activeSosAlert, setActiveSosAlert] = useState<SOSAlert | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -145,7 +171,7 @@ function FamilyDashboard({ userName }: Props) {
             }
 
             try {
-                const [familyData, patientsData] = await Promise.all([
+                const [familyData, patientsData, sosData] = await Promise.all([
                     requestJson(`${API_BASE_URL}/family/me`, {
                         headers: {
                             Authorization: `Bearer ${token}`
@@ -155,11 +181,17 @@ function FamilyDashboard({ userName }: Props) {
                         headers: {
                             Authorization: `Bearer ${token}`
                         }
+                    }),
+                    requestJson(`${API_BASE_URL}/sos`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
                     })
                 ]);
 
                 const resolvedFamilyRecord = familyData as FamilyRecord | null;
                 const patients = Array.isArray(patientsData) ? (patientsData as PatientRecord[]) : [];
+                const sosAlerts = Array.isArray(sosData) ? (sosData as SOSAlert[]) : [];
 
                 setFamilyRecord(resolvedFamilyRecord);
 
@@ -174,7 +206,10 @@ function FamilyDashboard({ userName }: Props) {
                     patients.find((patient) => patient.name === resolvedFamilyRecord.patient_name) ||
                     null;
 
+                const unresolvedAlerts = sosAlerts.filter((alert) => alert.status !== 'resolved');
+
                 setLinkedPatient(matchedPatient);
+                setActiveSosAlert(unresolvedAlerts[0] ?? null);
                 setError(matchedPatient ? '' : 'The linked patient record could not be found in the database.');
             } catch (loadError) {
                 console.error('Failed to load family dashboard:', loadError);
@@ -193,6 +228,10 @@ function FamilyDashboard({ userName }: Props) {
     const patientAddress = linkedPatient?.address || familyRecord?.address || 'Address not provided';
     const patientPhone = linkedPatient?.phone || familyRecord?.phone || 'Not provided';
     const vitalsStatus = getVitalsStatus(linkedPatient);
+    const sosStatusTitle = activeSosAlert ? 'SOS alert triggered' : 'SOS Status';
+    const sosStatusMessage = activeSosAlert
+        ? `${patientName} triggered SOS on ${formatSosTime(activeSosAlert.created_at)}.${activeSosAlert.location ? ` Location: ${activeSosAlert.location}.` : ''}`
+        : 'No emergency alerts triggered recently.';
     const vitalsCards = [
         {
             label: 'Heart Rate',
@@ -257,13 +296,25 @@ function FamilyDashboard({ userName }: Props) {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
-                    <div className="bg-rose-100 dark:bg-rose-900/30 p-3 rounded-full">
-                        <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                <div className={`rounded-2xl p-6 shadow-sm border flex items-center gap-4 ${activeSosAlert
+                    ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900'
+                    : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'
+                    }`}>
+                    <div className={`p-3 rounded-full ${activeSosAlert
+                        ? 'bg-rose-100 dark:bg-rose-900/40'
+                        : 'bg-rose-100 dark:bg-rose-900/30'
+                        }`}>
+                        <AlertTriangle className={`w-6 h-6 ${activeSosAlert
+                            ? 'text-rose-700 dark:text-rose-300'
+                            : 'text-rose-600 dark:text-rose-400'
+                            }`} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">SOS Status</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">No emergency alerts triggered recently.</p>
+                        <h3 className="font-bold text-slate-900 dark:text-white">{sosStatusTitle}</h3>
+                        <p className={`text-sm ${activeSosAlert
+                            ? 'text-rose-700 dark:text-rose-300'
+                            : 'text-slate-500 dark:text-slate-400'
+                            }`}>{sosStatusMessage}</p>
                     </div>
                 </div>
 

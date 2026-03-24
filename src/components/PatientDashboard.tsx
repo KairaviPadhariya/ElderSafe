@@ -39,6 +39,20 @@ type DailyHealthLog = {
   updated_at?: string;
 };
 
+type MedicationDose = {
+  medicine_name: string;
+  scheduled_label: string;
+};
+
+type MedicationSummary = {
+  total_doses: number;
+  taken_count: number;
+  pending_count: number;
+  skipped_count: number;
+  missed_count: number;
+  next_dose?: MedicationDose | null;
+};
+
 async function requestJson(url: string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -139,7 +153,6 @@ function parseServerTimestamp(value?: string) {
     return null;
   }
 
-  // Backend timestamps are stored with UTC time but may not include a trailing Z.
   const normalizedValue = /z$/i.test(value) ? value : `${value}Z`;
   const timestamp = new Date(normalizedValue);
 
@@ -147,12 +160,11 @@ function parseServerTimestamp(value?: string) {
 }
 
 function getLatestLogTimestamp(log: DailyHealthLog) {
-  const timestamp =
+  return (
     parseServerTimestamp(log.updated_at)
     || parseServerTimestamp(log.created_at)
-    || parseServerTimestamp(log.log_date ? `${log.log_date}T00:00:00` : undefined);
-
-  return timestamp;
+    || parseServerTimestamp(log.log_date ? `${log.log_date}T00:00:00` : undefined)
+  );
 }
 
 function PatientDashboard({ userName }: Props) {
@@ -161,7 +173,9 @@ function PatientDashboard({ userName }: Props) {
   const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
   const [appointmentError, setAppointmentError] = useState('');
   const [doctorCount, setDoctorCount] = useState<number | null>(null);
-  const [lastHealthEntry, setLastHealthEntry] = useState<string>('No entries yet');
+  const [lastHealthEntry, setLastHealthEntry] = useState('No entries yet');
+  const [medicationSummary, setMedicationSummary] = useState<MedicationSummary | null>(null);
+  const [medicationError, setMedicationError] = useState('');
 
   useEffect(() => {
     if (userName) {
@@ -258,11 +272,52 @@ function PatientDashboard({ userName }: Props) {
     loadDoctors();
   }, []);
 
+  useEffect(() => {
+    const loadMedicationSummary = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setMedicationError('Please log in again to view medications.');
+        return;
+      }
+
+      try {
+        const data = await requestJson(`${API_BASE_URL}/medications/today`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        setMedicationSummary((data?.summary as MedicationSummary | null) ?? null);
+        setMedicationError('');
+      } catch (error) {
+        console.error('Failed to load medication summary:', error);
+        setMedicationError(error instanceof Error ? error.message : 'Unable to load medications.');
+      }
+    };
+
+    loadMedicationSummary();
+  }, []);
+
   const appointmentStats = nextAppointment
     ? `Next: ${formatAppointmentSummary(nextAppointment)}`
     : appointmentError
       ? 'Unable to load appointment'
       : 'No upcoming appointments';
+
+  const medicationStats = medicationSummary
+    ? medicationSummary.next_dose
+      ? `Next: ${medicationSummary.next_dose.medicine_name} at ${medicationSummary.next_dose.scheduled_label}`
+      : medicationSummary.total_doses > 0
+        ? 'All doses complete today'
+        : 'No medications scheduled'
+    : medicationError || 'Loading medication plan';
+
+  const medicationReminder = medicationSummary?.next_dose
+    ? `Next dose: ${medicationSummary.next_dose.medicine_name} at ${medicationSummary.next_dose.scheduled_label}.`
+    : medicationSummary?.total_doses
+      ? 'Great work. All scheduled medication doses are complete for today.'
+      : medicationError || 'Add medications to start getting daily reminders.';
 
   const doctorStats = doctorCount === null
     ? 'Doctors unavailable'
@@ -315,7 +370,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Track your medicines and dosages',
       icon: Pill,
       color: 'bg-orange-500',
-      stats: '5 active prescriptions',
+      stats: medicationStats,
       path: '/medications'
     },
     {
@@ -412,7 +467,7 @@ function PatientDashboard({ userName }: Props) {
               Health Reminders
             </h3>
             <p className="text-amber-800">
-              Don&apos;t forget your medication at <b>6:00 PM</b>.
+              {medicationReminder}
             </p>
           </div>
         </div>

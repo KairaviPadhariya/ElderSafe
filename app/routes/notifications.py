@@ -8,6 +8,11 @@ from app.schemas.notification import NotificationCreate
 from app.utils.auth import verify_token
 
 router = APIRouter()
+SOS_ACTIVE_WINDOW = timedelta(hours=24)
+
+
+def get_sos_active_cutoff() -> datetime:
+    return datetime.utcnow() - SOS_ACTIVE_WINDOW
 
 
 def build_notification(notification_id: str, title: str, message: str, created_at, type_: str, priority: str):
@@ -83,6 +88,27 @@ async def get_family_record(user_id: str):
     return await database.family.find_one({"user_id": user_id})
 
 
+async def find_patient_profile_by_name(patient_name: str | None):
+    if not patient_name:
+        return None
+
+    return await database.patients.find_one({"name": patient_name})
+
+
+async def resolve_linked_patient_user_id(patient_reference: str | None) -> str | None:
+    if not patient_reference:
+        return None
+
+    patient_profile = None
+    if ObjectId.is_valid(patient_reference):
+        patient_profile = await database.patients.find_one({"_id": ObjectId(patient_reference)})
+
+    if patient_profile and patient_profile.get("user_id"):
+        return str(patient_profile["user_id"])
+
+    return patient_reference
+
+
 async def get_latest_health_log(patient_id: str):
     return await database.daily_health_logs.find_one(
         {"patient_id": patient_id},
@@ -90,12 +116,17 @@ async def get_latest_health_log(patient_id: str):
     )
 
 
+async def get_patient_profile_by_user_id(user_id: str):
+    return await database.patients.find_one({"user_id": user_id})
+
+
 async def get_active_sos_notifications(patient_id: str, label: str):
     notifications = []
 
     async for alert in database.sos.find({
         "patient_id": patient_id,
-        "status": {"$ne": "resolved"}
+        "status": {"$ne": "resolved"},
+        "created_at": {"$gte": get_sos_active_cutoff()}
     }).sort("created_at", -1):
         location = alert.get("location") or "Location unavailable"
         status = alert.get("status") or "active"
@@ -187,6 +218,8 @@ async def get_medication_notifications(patient_id: str, label: str):
 
 async def build_patient_notifications(current_user: dict):
     patient_id = current_user["sub"]
+    patient_profile = await get_patient_profile_by_user_id(patient_id)
+    medication_patient_id = str(patient_profile["_id"]) if patient_profile else patient_id
     notifications = []
 
     notifications.extend(await get_active_sos_notifications(patient_id, "you"))
@@ -225,7 +258,7 @@ async def build_patient_notifications(current_user: dict):
             )
         )
 
-    notifications.extend(await get_medication_notifications(patient_id, "You"))
+    notifications.extend(await get_medication_notifications(medication_patient_id, "You"))
     notifications.extend(await get_document_notifications([patient_id], "Your record"))
 
     return notifications
@@ -234,7 +267,7 @@ async def build_patient_notifications(current_user: dict):
 async def build_family_notifications(current_user: dict):
     family_record = await get_family_record(current_user["sub"])
 
-    if not family_record or not family_record.get("patient_id"):
+    if not family_record:
         return [
             build_notification(
                 f"family-link-missing-{current_user['sub']}",
@@ -246,13 +279,37 @@ async def build_family_notifications(current_user: dict):
             )
         ]
 
-    patient_id = str(family_record["patient_id"])
-    patient_name = family_record.get("patient_name") or await get_user_name(patient_id)
+    patient_reference = str(family_record["patient_id"]) if family_record.get("patient_id") else None
+    matched_patient_profile = None
+
+    if not patient_reference and family_record.get("patient_name"):
+        matched_patient_profile = await find_patient_profile_by_name(family_record.get("patient_name"))
+        if matched_patient_profile:
+            patient_reference = str(matched_patient_profile["_id"])
+
+    if not patient_reference:
+        return [
+            build_notification(
+                f"family-link-missing-{current_user['sub']}",
+                "Patient link required",
+                "Complete the family profile to connect notifications to a patient.",
+                datetime.utcnow(),
+                "user",
+                "medium"
+            )
+        ]
+
+    sos_patient_id = await resolve_linked_patient_user_id(patient_reference) or patient_reference
+    patient_name = (
+        family_record.get("patient_name")
+        or (matched_patient_profile or {}).get("name")
+        or await get_user_name(patient_reference)
+    )
     notifications = []
 
-    notifications.extend(await get_active_sos_notifications(patient_id, patient_name))
+    notifications.extend(await get_active_sos_notifications(sos_patient_id, patient_name))
     notifications.extend(await get_upcoming_appointment_notifications(
-        {"patient_id": patient_id},
+        {"patient_id": patient_reference},
         lambda appointment: (
             f"{patient_name} has an appointment with {appointment.get('doctor_name') or 'the doctor'} on "
             f"{appointment.get('date')} at {appointment.get('time')}."
@@ -260,11 +317,11 @@ async def build_family_notifications(current_user: dict):
     ))
 
     today = datetime.utcnow().date().isoformat()
-    today_log = await database.daily_health_logs.find_one({"patient_id": patient_id, "log_date": today})
+    today_log = await database.daily_health_logs.find_one({"patient_id": patient_reference, "log_date": today})
     if not today_log:
         notifications.append(
             build_notification(
-                f"family-daily-log-missing-{patient_id}-{today}",
+                f"family-daily-log-missing-{patient_reference}-{today}",
                 "Daily log missing",
                 f"No daily health log has been saved for {patient_name} today.",
                 datetime.utcnow(),
@@ -273,7 +330,7 @@ async def build_family_notifications(current_user: dict):
             )
         )
 
-    latest_log = await get_latest_health_log(patient_id)
+    latest_log = await get_latest_health_log(patient_reference)
     if latest_log and is_health_log_abnormal(latest_log):
         notifications.append(
             build_notification(
@@ -286,8 +343,8 @@ async def build_family_notifications(current_user: dict):
             )
         )
 
-    notifications.extend(await get_medication_notifications(patient_id, patient_name))
-    notifications.extend(await get_document_notifications([patient_id], f"{patient_name}'s record"))
+    notifications.extend(await get_medication_notifications(patient_reference, patient_name))
+    notifications.extend(await get_document_notifications([patient_reference], f"{patient_name}'s record"))
 
     return notifications
 
@@ -354,8 +411,6 @@ async def build_doctor_notifications(current_user: dict):
     for patient_id in patient_ids[:5]:
         patient_name = await get_user_name(patient_id)
 
-        notifications.extend(await get_active_sos_notifications(patient_id, patient_name))
-
         latest_log = await get_latest_health_log(patient_id)
         if latest_log and is_health_log_abnormal(latest_log):
             notifications.append(
@@ -392,15 +447,20 @@ async def create_notification(
 async def get_notifications(current_user: dict = Depends(verify_token)):
     role = current_user.get("role")
     notifications = []
+    sos_cutoff = get_sos_active_cutoff()
 
     stored_notifications = []
     async for record in database.notifications.find({"user_id": current_user["sub"]}).sort("created_at", -1):
+        created_at = record.get("created_at") or datetime.utcnow()
+        if record.get("source") == "sos" and created_at < sos_cutoff:
+            continue
+
         stored_notifications.append(
             build_notification(
                 f"stored-{record['_id']}",
                 record.get("title") or "Notification",
                 record.get("message") or "",
-                record.get("created_at") or datetime.utcnow(),
+                created_at,
                 record.get("type") or "user",
                 record.get("priority") or "low"
             )
