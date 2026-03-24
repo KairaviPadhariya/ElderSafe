@@ -116,6 +116,10 @@ async def get_latest_health_log(patient_id: str):
     )
 
 
+async def get_patient_profile_by_user_id(user_id: str):
+    return await database.patients.find_one({"user_id": user_id})
+
+
 async def get_active_sos_notifications(patient_id: str, label: str):
     notifications = []
 
@@ -214,6 +218,8 @@ async def get_medication_notifications(patient_id: str, label: str):
 
 async def build_patient_notifications(current_user: dict):
     patient_id = current_user["sub"]
+    patient_profile = await get_patient_profile_by_user_id(patient_id)
+    medication_patient_id = str(patient_profile["_id"]) if patient_profile else patient_id
     notifications = []
 
     notifications.extend(await get_active_sos_notifications(patient_id, "you"))
@@ -252,7 +258,7 @@ async def build_patient_notifications(current_user: dict):
             )
         )
 
-    notifications.extend(await get_medication_notifications(patient_id, "You"))
+    notifications.extend(await get_medication_notifications(medication_patient_id, "You"))
     notifications.extend(await get_document_notifications([patient_id], "Your record"))
 
     return notifications
