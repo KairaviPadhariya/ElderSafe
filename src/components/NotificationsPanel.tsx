@@ -1,4 +1,4 @@
-import { X, Bell, Calendar, Pill, AlertCircle, User, FileText } from 'lucide-react';
+import { X, Bell, Calendar, Pill, AlertCircle, User, FileText, Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface NotificationsPanelProps {
@@ -114,6 +114,7 @@ function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) 
                 else if (notification.type === 'alert') Icon = AlertCircle;
                 else if (notification.type === 'user') Icon = User;
                 else if (notification.type === 'report') Icon = FileText;
+                else if (notification.type === 'message') Icon = Mail;
 
                 const accentClass =
                   notification.priority === 'high'

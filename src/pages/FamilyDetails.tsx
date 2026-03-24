@@ -118,12 +118,12 @@ function FamilyDetails() {
             <div className="max-w-4xl mx-auto">
                 <BackButton />
                 <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-700">
-                    <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-10 text-center">
+                    <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-10 text-center">
                         <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm shadow-lg">
                             <HeartHandshake className="w-8 h-8 text-white" />
                         </div>
                         <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Family Profile</h2>
-                        <p className="text-amber-100 text-lg max-w-2xl mx-auto">
+                        <p className="text-emerald-50 text-lg max-w-2xl mx-auto">
                             Add the family and patient relationship details needed for caregiving access.
                         </p>
                     </div>
@@ -138,7 +138,7 @@ function FamilyDetails() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="md:col-span-2 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2">
                                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                    <UserRound className="w-5 h-5 text-amber-500" />
+                                    <UserRound className="w-5 h-5 text-emerald-500" />
                                     Care Relationship
                                 </h3>
                             </div>
@@ -156,7 +156,7 @@ function FamilyDetails() {
                                             patientName: selectedPatient?.name || ''
                                         }));
                                     }}
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                     disabled={patientsLoading || patients.length === 0}
                                 >
                                     <option value="">
@@ -179,7 +179,7 @@ function FamilyDetails() {
                                     value={formData.relation}
                                     onChange={handleChange}
                                     placeholder="Son / Daughter / Spouse"
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                 />
                             </div>
 
@@ -190,7 +190,7 @@ function FamilyDetails() {
                                         name="accessLevel"
                                         value={formData.accessLevel}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     >
                                         <option value="Full Access">Full Access</option>
                                         <option value="View Only">View Only</option>
@@ -209,7 +209,7 @@ function FamilyDetails() {
                                         value={formData.phone}
                                         onChange={handleChange}
                                         placeholder="+1 (555) 234-5678"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <Phone className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -224,7 +224,7 @@ function FamilyDetails() {
                                         value={formData.address}
                                         onChange={handleChange}
                                         placeholder="456 Pine Street, Springfield, IL 62702"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <MapPin className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -243,7 +243,7 @@ function FamilyDetails() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-amber-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

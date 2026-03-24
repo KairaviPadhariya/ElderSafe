@@ -32,6 +32,13 @@ type Appointment = {
   status?: string;
 };
 
+type DailyHealthLog = {
+  _id?: string;
+  log_date?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 async function requestJson(url: string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -92,11 +99,69 @@ function formatAppointmentSummary(appointment: Appointment) {
   return `${dayLabel}, ${timeLabel} with ${doctorName}`;
 }
 
+function formatRelativeTime(timestamp: Date) {
+  const now = new Date();
+  const diffMs = now.getTime() - timestamp.getTime();
+
+  if (Number.isNaN(diffMs)) {
+    return 'Recently';
+  }
+
+  const minutes = Math.max(Math.floor(diffMs / 60000), 0);
+
+  if (minutes < 1) {
+    return 'Just now';
+  }
+
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  }
+
+  return timestamp.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function parseServerTimestamp(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  // Backend timestamps are stored with UTC time but may not include a trailing Z.
+  const normalizedValue = /z$/i.test(value) ? value : `${value}Z`;
+  const timestamp = new Date(normalizedValue);
+
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp;
+}
+
+function getLatestLogTimestamp(log: DailyHealthLog) {
+  const timestamp =
+    parseServerTimestamp(log.updated_at)
+    || parseServerTimestamp(log.created_at)
+    || parseServerTimestamp(log.log_date ? `${log.log_date}T00:00:00` : undefined);
+
+  return timestamp;
+}
+
 function PatientDashboard({ userName }: Props) {
   const navigate = useNavigate();
   const [name, setName] = useState('User');
   const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
   const [appointmentError, setAppointmentError] = useState('');
+  const [doctorCount, setDoctorCount] = useState<number | null>(null);
+  const [lastHealthEntry, setLastHealthEntry] = useState<string>('No entries yet');
 
   useEffect(() => {
     if (userName) {
@@ -146,11 +211,66 @@ function PatientDashboard({ userName }: Props) {
     loadNextAppointment();
   }, []);
 
+  useEffect(() => {
+    const loadLatestHealthEntry = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLastHealthEntry('Unavailable');
+        return;
+      }
+
+      try {
+        const data = await requestJson(`${API_BASE_URL}/daily_health_logs`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const logs = Array.isArray(data) ? (data as DailyHealthLog[]) : [];
+        const latestTimestamp = logs
+          .map(getLatestLogTimestamp)
+          .filter((value): value is Date => value instanceof Date)
+          .sort((first, second) => second.getTime() - first.getTime())[0];
+
+        setLastHealthEntry(latestTimestamp ? formatRelativeTime(latestTimestamp) : 'No entries yet');
+      } catch (error) {
+        console.error('Failed to load latest health entry:', error);
+        setLastHealthEntry('Unavailable');
+      }
+    };
+
+    loadLatestHealthEntry();
+  }, []);
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const data = await requestJson(`${API_BASE_URL}/doctors`);
+        const doctors = Array.isArray(data) ? data : [];
+        setDoctorCount(doctors.length);
+      } catch (error) {
+        console.error('Failed to load doctors count:', error);
+        setDoctorCount(null);
+      }
+    };
+
+    loadDoctors();
+  }, []);
+
   const appointmentStats = nextAppointment
     ? `Next: ${formatAppointmentSummary(nextAppointment)}`
     : appointmentError
       ? 'Unable to load appointment'
       : 'No upcoming appointments';
+
+  const doctorStats = doctorCount === null
+    ? 'Doctors unavailable'
+    : doctorCount === 0
+      ? 'No doctors added'
+      : `${doctorCount} doctor${doctorCount === 1 ? '' : 's'}`;
+
+  const healthEntryStats = `Last entry: ${lastHealthEntry}`;
 
   const featureCards = [
     {
@@ -159,7 +279,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Record heart rate, blood pressure, and glucose levels',
       icon: Plus,
       color: 'bg-blue-500',
-      stats: 'Last entry: 2 hours ago',
+      stats: healthEntryStats,
       path: '/daily-logs'
     },
     {
@@ -186,7 +306,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Contact your healthcare providers',
       icon: Stethoscope,
       color: 'bg-cyan-500',
-      stats: '3 doctors',
+      stats: doctorStats,
       path: '/doctors'
     },
     {

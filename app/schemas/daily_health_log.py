@@ -8,6 +8,7 @@ class DailyHealthLogCreate(BaseModel):
     systolic_bp: int
     diastolic_bp: int
     heart_rate: int
+    o2_saturation: Optional[int] = None
     fasting_blood_glucose: Optional[int] = None
     post_prandial_glucose: Optional[int] = None
     weight: Optional[float] = None

@@ -76,12 +76,12 @@ function DoctorDetails() {
             <div className="max-w-4xl mx-auto">
                 <BackButton />
                 <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-700">
-                    <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-8 py-10 text-center">
+                    <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-10 text-center">
                         <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm shadow-lg">
                             <Stethoscope className="w-8 h-8 text-white" />
                         </div>
                         <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Doctor Profile</h2>
-                        <p className="text-cyan-100 text-lg max-w-2xl mx-auto">
+                        <p className="text-emerald-50 text-lg max-w-2xl mx-auto">
                             Add the professional details patients should see when they view your profile.
                         </p>
                     </div>
@@ -96,7 +96,7 @@ function DoctorDetails() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="md:col-span-2 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2">
                                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                    <UserRound className="w-5 h-5 text-cyan-500" />
+                                    <UserRound className="w-5 h-5 text-emerald-500" />
                                     Professional Information
                                 </h3>
                             </div>
@@ -111,7 +111,7 @@ function DoctorDetails() {
                                         value={formData.specialization}
                                         onChange={handleChange}
                                         placeholder="Cardiologist"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <Stethoscope className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -127,7 +127,7 @@ function DoctorDetails() {
                                         value={formData.hospital}
                                         onChange={handleChange}
                                         placeholder="City Heart Care Center"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <Building2 className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -143,7 +143,7 @@ function DoctorDetails() {
                                         value={formData.phone}
                                         onChange={handleChange}
                                         placeholder="+1 (555) 123-4567"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <Phone className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -171,7 +171,7 @@ function DoctorDetails() {
                                         value={formData.licenseNo}
                                         onChange={handleChange}
                                         placeholder="MD-12345-CA"
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <FileText className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                 </div>
@@ -185,7 +185,7 @@ function DoctorDetails() {
                                     value={formData.experienceYears}
                                     onChange={handleChange}
                                     placeholder="10"
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                 />
                             </div>
 
@@ -197,7 +197,7 @@ function DoctorDetails() {
                                     value={formData.bio}
                                     onChange={handleChange}
                                     placeholder="Tell patients about your experience, care approach, and areas of focus."
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:text-white transition-all outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                 />
                             </div>
                         </div>
@@ -214,7 +214,7 @@ function DoctorDetails() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

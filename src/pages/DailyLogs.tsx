@@ -11,6 +11,7 @@ type DailyLogFormState = {
     systolicBp: string;
     diastolicBp: string;
     heartRate: string;
+    o2Saturation: string;
     fastingBloodGlucose: string;
     postPrandialGlucose: string;
     weight: string;
@@ -24,6 +25,7 @@ type DailyLogResponse = {
     systolic_bp: number;
     diastolic_bp: number;
     heart_rate: number;
+    o2_saturation?: number;
     fasting_blood_glucose?: number;
     post_prandial_glucose?: number;
     weight?: number;
@@ -41,6 +43,7 @@ function createEmptyFormState(): DailyLogFormState {
         systolicBp: '120',
         diastolicBp: '80',
         heartRate: '',
+        o2Saturation: '',
         fastingBloodGlucose: '',
         postPrandialGlucose: '',
         weight: '',
@@ -151,6 +154,7 @@ function DailyLogs() {
                     systolicBp: String(log.systolic_bp ?? ''),
                     diastolicBp: String(log.diastolic_bp ?? ''),
                     heartRate: String(log.heart_rate ?? ''),
+                    o2Saturation: log.o2_saturation != null ? String(log.o2_saturation) : '',
                     fastingBloodGlucose: log.fasting_blood_glucose != null ? String(log.fasting_blood_glucose) : '',
                     postPrandialGlucose: log.post_prandial_glucose != null ? String(log.post_prandial_glucose) : '',
                     weight: log.weight != null ? String(log.weight) : '',
@@ -204,6 +208,7 @@ function DailyLogs() {
                     systolic_bp: Number(formData.systolicBp),
                     diastolic_bp: Number(formData.diastolicBp),
                     heart_rate: Number(formData.heartRate),
+                    o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
                     fasting_blood_glucose: formData.fastingBloodGlucose ? Number(formData.fastingBloodGlucose) : null,
                     post_prandial_glucose: formData.postPrandialGlucose ? Number(formData.postPrandialGlucose) : null,
                     weight: formData.weight ? Number(formData.weight) : null,
@@ -252,6 +257,7 @@ function DailyLogs() {
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">BP</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Heart Rate</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Oxygen</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Glucose</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Notes</th>
                                     </tr>
@@ -264,6 +270,7 @@ function DailyLogs() {
                                                 {entry.systolic_bp}/{entry.diastolic_bp}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{entry.heart_rate} bpm</td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{entry.o2_saturation ?? '--'}%</td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
                                                 F: {entry.fasting_blood_glucose ?? '--'} / PP: {entry.post_prandial_glucose ?? '--'}
                                             </td>
@@ -334,6 +341,18 @@ function DailyLogs() {
                                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"
                                     placeholder="72"
                                     required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Oxygen Saturation (%)</label>
+                                <input
+                                    type="number"
+                                    name="o2Saturation"
+                                    value={formData.o2Saturation}
+                                    onChange={handleChange}
+                                    disabled={initialLoading || loading}
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"
+                                    placeholder="98"
                                 />
                             </div>
                         </div>
