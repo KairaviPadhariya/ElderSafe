@@ -1,4 +1,5 @@
-const ML_API_URL = "http://127.0.0.1:8010";
+const DEFAULT_ML_API_URL = "http://127.0.0.1:8010";
+const ML_API_URL = (import.meta.env.VITE_ML_API_URL || DEFAULT_ML_API_URL).replace(/\/$/, "");
 
 export type SafetyPredictionPayload = {
   patient_id?: string;
