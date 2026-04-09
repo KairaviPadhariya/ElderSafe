@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Heart, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, decodeJWT } from '../utils/api';
+import { registerUser } from '../services/api';
 
 function Register() {
     const [loading, setLoading] = useState(false);
@@ -43,8 +44,7 @@ function Register() {
         }
 
         try {
-            await api.register({ name: name.trim(), email: email.trim(), password, role });
-
+            await registerUser(name.trim(), email.trim(), password, role);
             if (role === 'patient' || role === 'doctor' || role === 'family') {
                 const loginData = await api.login({ email: email.trim(), password });
                 const decoded = decodeJWT(loginData.access_token);
@@ -123,7 +123,7 @@ function Register() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
-                                    placeholder="John Doe"
+                                    placeholder="Hima Mehta"
                                     required
                                 />
                             </div>

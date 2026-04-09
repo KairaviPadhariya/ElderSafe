@@ -24,7 +24,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Allow specific origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,3 +59,7 @@ async def db_test():
         return {"connected": True, "collections": collections}
     except Exception as e:
         return {"connected": False, "error": str(e)}
+
+@app.get("/")
+def test():
+    return {"message": "Backend working"}

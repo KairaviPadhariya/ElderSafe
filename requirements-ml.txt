@@ -6,3 +6,10 @@ scikit-learn
 matplotlib
 seaborn
 pydantic
+pydantic[email]
+email-validator
+motor
+python-dotenv
+passlib[bcrypt]
+python-jose
+python-multipart

@@ -23,6 +23,11 @@ async def create_user(user: UserCreate):
 
     user_dict = user.dict()
 
+    # Check if email already exists
+    existing_user = await database.users.find_one({"email": user.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     # hash password
     user_dict["password"] = hash_password(user.password)
     user_dict["created_at"] = datetime.utcnow()
