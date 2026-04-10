@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Droplets, Heart, TrendingUp, Weight } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
@@ -264,8 +265,12 @@ function MultiLineChartCard({
 }
 
 function HealthTrends() {
+  const [searchParams] = useSearchParams();
   const role = localStorage.getItem('userRole') || 'patient';
   const isFamilyView = role === 'family';
+  const isDoctorView = role === 'doctor';
+  const selectedPatientId = searchParams.get('patientId') || '';
+  const selectedPatientName = searchParams.get('patientName') || '';
   const [entries, setEntries] = useState<DailyLogResponse[]>([]);
   const [linkedPatientName, setLinkedPatientName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -288,9 +293,17 @@ function HealthTrends() {
           },
         });
         setLinkedPatientName((familyData as FamilyRecord | null)?.patient_name || '');
+      } else if (isDoctorView) {
+        setLinkedPatientName(selectedPatientName);
       }
 
-      const logs = await requestJson(`${API_BASE_URL}/daily_health_logs`, {
+      const url = new URL(`${API_BASE_URL}/daily_health_logs`);
+
+      if (isDoctorView && selectedPatientId) {
+        url.searchParams.set('patient_id', selectedPatientId);
+      }
+
+      const logs = await requestJson(url.toString(), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -306,7 +319,7 @@ function HealthTrends() {
     } finally {
       setLoading(false);
     }
-  }, [isFamilyView]);
+  }, [isDoctorView, isFamilyView, selectedPatientId, selectedPatientName]);
 
   useEffect(() => {
     loadLogs();
@@ -364,9 +377,11 @@ function HealthTrends() {
   }, [entries]);
 
   const latestEntry = entries.length > 0 ? entries[entries.length - 1] : undefined;
-  const pageSubtitle = isFamilyView
-    ? `Visualizing previous logged data for ${linkedPatientName || 'the linked patient'}`
-    : 'Visualizing your vital metrics over time';
+  const pageSubtitle = isDoctorView
+    ? `Viewing health trends for ${linkedPatientName || 'the selected patient'}`
+    : isFamilyView
+      ? `Visualizing previous logged data for ${linkedPatientName || 'the linked patient'}`
+      : 'Visualizing your vital metrics over time';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
