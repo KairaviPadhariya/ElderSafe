@@ -29,3 +29,8 @@ __pycache__/
 *.pyd
 
 venv/
+
+node_modules/
+dist/
+*.pkl
+*.csv

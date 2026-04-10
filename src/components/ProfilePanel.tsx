@@ -156,6 +156,8 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     onClose();

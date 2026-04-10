@@ -64,7 +64,7 @@ def is_health_log_abnormal(log: dict) -> bool:
         heart_rate is not None and (heart_rate < 60 or heart_rate > 100),
         fasting is not None and fasting >= 126,
         post_prandial is not None and post_prandial >= 200,
-        temperature is not None and temperature >= 100.4,
+        temperature is not None and temperature >= 38.0,
     ])
 
 

@@ -70,19 +70,19 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
     switch (role) {
       case 'doctor':
         return [
-          { name: 'Dashboard', path: '/' },
+          { name: 'Dashboard', path: '/dashboard' },
           { name: 'My Patients', path: '/patients' },
           { name: 'Appointments', path: '/appointments' },
         ];
       case 'family':
         return [
-          { name: 'Dashboard', path: '/' },
+          { name: 'Dashboard', path: '/dashboard' },
           { name: 'Patient Overview', path: '/medical-details' },
           { name: 'Care Team', path: '/doctors' },
         ];
       default:
         return [
-          { name: 'Dashboard', path: '/' },
+          { name: 'Dashboard', path: '/dashboard' },
           { name: 'Medical Details', path: '/medical-details' },
           { name: 'My Appointments', path: '/appointments' },
         ];
@@ -96,7 +96,7 @@ function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-3">
+            <Link to={role ? '/dashboard' : '/'} className="flex items-center gap-3">
               <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 p-2 rounded-xl shadow-lg shadow-emerald-500/20">
                 <Heart className="w-6 h-6 text-white" fill="white" />
               </div>

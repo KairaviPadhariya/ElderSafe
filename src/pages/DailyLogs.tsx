@@ -14,7 +14,6 @@ type DailyLogFormState = {
     o2Saturation: string;
     fastingBloodGlucose: string;
     postPrandialGlucose: string;
-    weight: string;
     temperature: string;
     notes: string;
 };
@@ -46,7 +45,6 @@ function createEmptyFormState(): DailyLogFormState {
         o2Saturation: '',
         fastingBloodGlucose: '',
         postPrandialGlucose: '',
-        weight: '',
         temperature: '',
         notes: ''
     };
@@ -157,7 +155,6 @@ function DailyLogs() {
                     o2Saturation: log.o2_saturation != null ? String(log.o2_saturation) : '',
                     fastingBloodGlucose: log.fasting_blood_glucose != null ? String(log.fasting_blood_glucose) : '',
                     postPrandialGlucose: log.post_prandial_glucose != null ? String(log.post_prandial_glucose) : '',
-                    weight: log.weight != null ? String(log.weight) : '',
                     temperature: log.temperature != null ? String(log.temperature) : '',
                     notes: log.notes ?? ''
                 });
@@ -211,7 +208,6 @@ function DailyLogs() {
                     o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
                     fasting_blood_glucose: formData.fastingBloodGlucose ? Number(formData.fastingBloodGlucose) : null,
                     post_prandial_glucose: formData.postPrandialGlucose ? Number(formData.postPrandialGlucose) : null,
-                    weight: formData.weight ? Number(formData.weight) : null,
                     temperature: formData.temperature ? Number(formData.temperature) : null,
                     notes: formData.notes.trim() || null
                 })
@@ -394,24 +390,11 @@ function DailyLogs() {
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                             <Activity className="w-5 h-5 text-emerald-500" />
-                            Other Metrics
+                            Temperature And Notes
                         </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Weight (kg)</label>
-                                <input
-                                    type="number"
-                                    name="weight"
-                                    step="0.1"
-                                    value={formData.weight}
-                                    onChange={handleChange}
-                                    disabled={initialLoading || loading}
-                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"
-                                    placeholder="kg"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Temperature (F)</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Temperature (C)</label>
                                 <input
                                     type="number"
                                     name="temperature"
@@ -420,7 +403,7 @@ function DailyLogs() {
                                     onChange={handleChange}
                                     disabled={initialLoading || loading}
                                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"
-                                    placeholder="98.6"
+                                    placeholder="37.0"
                                 />
                             </div>
                         </div>
