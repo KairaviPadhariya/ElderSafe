@@ -4,7 +4,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: dockerfile.backend
+      dockerfile: Dockerfile.backend
       container_name: backend
     ports:
       - "8000:8000"
@@ -12,7 +12,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: dockerfile.frontend
+      dockerfile: Dockerfile.frontend
       container_name: frontend
     ports:
       - "5173:5173"
