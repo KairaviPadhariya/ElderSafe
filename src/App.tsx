@@ -4,11 +4,19 @@ import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
 import NotificationsPanel from './components/NotificationsPanel';
 import ProfilePanel from './components/ProfilePanel';
+<<<<<<< HEAD
 import Dashboard from './components/Dashboard';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
+=======
+import Dashboard from './components/Dashboard.tsx';
+import MainLayout from './components/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login.tsx';
+import Register from './pages/Register.tsx';
+>>>>>>> hima
 import MedicalDetails from './pages/MedicalDetails';
 import DoctorDetails from './pages/DoctorDetails';
 import FamilyDetails from './pages/FamilyDetails';
