@@ -24,6 +24,8 @@ def serialize_medication(medication: dict):
 
 def serialize_medication_log(log: dict):
     log["_id"] = str(log["_id"])
+    if isinstance(log.get("medication_id"), ObjectId):
+        log["medication_id"] = str(log["medication_id"])
 
     for field in ("created_at", "updated_at"):
         if isinstance(log.get(field), datetime):

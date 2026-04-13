@@ -1,5 +1,5 @@
 import { ChangeEvent, useCallback, useEffect, useState } from 'react';
-import { Download, FileText, Loader2, Upload } from 'lucide-react';
+import { FileText, Loader2, Upload } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
 
@@ -12,6 +12,11 @@ type MedicalDocument = {
     content_type?: string;
     size?: number;
     uploaded_at?: string;
+};
+
+type DocumentPreview = {
+    url: string;
+    contentType: string;
 };
 
 function formatFileSize(size?: number) {
@@ -83,6 +88,17 @@ function MedicalHistory() {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+    const [preview, setPreview] = useState<DocumentPreview | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+
+    useEffect(() => {
+        return () => {
+            if (preview?.url) {
+                window.URL.revokeObjectURL(preview.url);
+            }
+        };
+    }, [preview]);
 
     const loadDocuments = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -170,13 +186,17 @@ function MedicalHistory() {
         }
     };
 
-    const handleDownload = async (documentRecord: MedicalDocument) => {
+    const handlePreviewDocument = async (documentRecord: MedicalDocument) => {
         const token = localStorage.getItem('token');
 
         if (!token) {
-            setError('Please log in again to download documents.');
+            setError('Please log in again to view documents.');
             return;
         }
+
+        setPreviewLoading(true);
+        setError('');
+        setSelectedDocumentId(documentRecord.id);
 
         try {
             const response = await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
@@ -188,21 +208,27 @@ function MedicalHistory() {
             if (!response.ok) {
                 const text = await response.text();
                 const data = text ? JSON.parse(text) : null;
-                throw new Error(data?.detail || data?.message || 'Download failed');
+                throw new Error(data?.detail || data?.message || 'Preview failed');
             }
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            const link = window.document.createElement('a');
-            link.href = url;
-            link.download = documentRecord.filename;
-            window.document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (downloadError) {
-            console.error('Failed to download document:', downloadError);
-            setError(downloadError instanceof Error ? downloadError.message : 'Unable to download the document.');
+            setPreview((current) => {
+                if (current?.url) {
+                    window.URL.revokeObjectURL(current.url);
+                }
+
+                return {
+                    url,
+                    contentType: blob.type || documentRecord.content_type || 'application/octet-stream'
+                };
+            });
+        } catch (previewError) {
+            console.error('Failed to preview document:', previewError);
+            setError(previewError instanceof Error ? previewError.message : 'Unable to preview the document.');
+            setSelectedDocumentId(null);
+        } finally {
+            setPreviewLoading(false);
         }
     };
 
@@ -285,15 +311,21 @@ function MedicalHistory() {
                             <FileText className="mx-auto mb-3 h-10 w-10 text-slate-400" />
                             <h3 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">No documents uploaded yet</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Upload prescriptions, reports, or scans so they are easy to keep and download later.
+                                Upload prescriptions, reports, or scans so they are easy to open and review later.
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-3">
                             {documents.map((documentRecord) => (
-                                <div
+                                <button
+                                    type="button"
                                     key={documentRecord.id}
-                                    className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between"
+                                    onClick={() => handlePreviewDocument(documentRecord)}
+                                    className={`flex w-full flex-col gap-4 rounded-2xl border p-4 text-left transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                                        selectedDocumentId === documentRecord.id
+                                            ? 'border-pink-200 bg-pink-50 dark:border-pink-500/40 dark:bg-pink-500/10'
+                                            : 'border-slate-100 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-900/60'
+                                    }`}
                                 >
                                     <div className="min-w-0">
                                         <p className="truncate text-base font-semibold text-slate-900 dark:text-white">{documentRecord.filename}</p>
@@ -301,19 +333,51 @@ function MedicalHistory() {
                                             {formatUploadedAt(documentRecord.uploaded_at)} | {formatFileSize(documentRecord.size)}
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDownload(documentRecord)}
-                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        Download
-                                    </button>
-                                </div>
+                                    <span className="text-sm font-semibold text-pink-600 dark:text-pink-300">
+                                        {selectedDocumentId === documentRecord.id ? 'Open below' : 'Click to view'}
+                                    </span>
+                                </button>
                             ))}
                         </div>
                     )}
                 </div>
+
+                {(previewLoading || preview) && (
+                    <div className="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <div className="mb-4">
+                            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Document preview</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                {previewLoading ? 'Opening document...' : 'Selected document is shown below.'}
+                            </p>
+                        </div>
+
+                        {previewLoading ? (
+                            <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40">
+                                <Loader2 className="h-6 w-6 animate-spin text-pink-500" />
+                            </div>
+                        ) : preview?.contentType.startsWith('image/') ? (
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40">
+                                <img
+                                    src={preview.url}
+                                    alt="Medical document preview"
+                                    className="max-h-[720px] w-full object-contain"
+                                />
+                            </div>
+                        ) : preview?.contentType === 'application/pdf' ? (
+                            <iframe
+                                title="Medical document preview"
+                                src={preview.url}
+                                className="h-[720px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-700"
+                            />
+                        ) : (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/40">
+                                <p className="text-slate-600 dark:text-slate-300">
+                                    This file type cannot be previewed inline yet.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
