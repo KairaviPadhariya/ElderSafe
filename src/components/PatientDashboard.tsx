@@ -86,6 +86,15 @@ function getAppointmentDateTime(appointment: Appointment) {
   return new Date(`${appointment.date}T${appointment.time}`);
 }
 
+function isUpcomingAppointment(appointment: Appointment, now = new Date()) {
+  if (appointment.status === 'cancelled') {
+    return false;
+  }
+
+  const appointmentDate = getAppointmentDateTime(appointment);
+  return !Number.isNaN(appointmentDate.getTime()) && appointmentDate >= now;
+}
+
 function formatAppointmentSummary(appointment: Appointment) {
   const appointmentDate = getAppointmentDateTime(appointment);
   const now = new Date();
@@ -176,6 +185,7 @@ function PatientDashboard({ userName }: Props) {
   const [lastHealthEntry, setLastHealthEntry] = useState('No entries yet');
   const [medicationSummary, setMedicationSummary] = useState<MedicationSummary | null>(null);
   const [medicationError, setMedicationError] = useState('');
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
     if (userName) {
@@ -187,6 +197,14 @@ function PatientDashboard({ userName }: Props) {
       }
     }
   }, [userName]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const loadNextAppointment = async () => {
@@ -205,13 +223,8 @@ function PatientDashboard({ userName }: Props) {
         });
 
         const appointments = Array.isArray(data) ? (data as Appointment[]) : [];
-        const now = new Date();
         const upcomingAppointments = appointments
-          .filter((appointment) => appointment.status !== 'cancelled')
-          .filter((appointment) => {
-            const appointmentDate = getAppointmentDateTime(appointment);
-            return !Number.isNaN(appointmentDate.getTime()) && appointmentDate >= now;
-          })
+          .filter((appointment) => isUpcomingAppointment(appointment, currentTime))
           .sort((first, second) => getAppointmentDateTime(first).getTime() - getAppointmentDateTime(second).getTime());
 
         setNextAppointment(upcomingAppointments[0] ?? null);
@@ -223,7 +236,7 @@ function PatientDashboard({ userName }: Props) {
     };
 
     loadNextAppointment();
-  }, []);
+  }, [currentTime]);
 
   useEffect(() => {
     const loadLatestHealthEntry = async () => {

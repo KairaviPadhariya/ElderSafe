@@ -60,6 +60,19 @@ function createEmptyFormState(): AppointmentFormState {
     };
 }
 
+function getAppointmentDateTime(appointment: Appointment) {
+    return new Date(`${appointment.date}T${appointment.time}`);
+}
+
+function isUpcomingAppointment(appointment: Appointment, now = new Date()) {
+    if (appointment.status === 'cancelled') {
+        return false;
+    }
+
+    const appointmentDate = getAppointmentDateTime(appointment);
+    return !Number.isNaN(appointmentDate.getTime()) && appointmentDate >= now;
+}
+
 async function requestJson(url: string, options: RequestInit = {}) {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -104,9 +117,18 @@ function Appointments() {
     const [updatingId, setUpdatingId] = useState<string | number | null>(null);
     const [cancellingId, setCancellingId] = useState<string | number | null>(null);
     const [error, setError] = useState('');
+    const [currentTime, setCurrentTime] = useState(() => new Date());
 
-    const visibleAppointments = appointments.filter((appointment) => appointment.status !== 'cancelled');
+    const visibleAppointments = appointments.filter((appointment) => isUpcomingAppointment(appointment, currentTime));
     const minDate = getTodayDate();
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000);
+
+        return () => window.clearInterval(intervalId);
+    }, []);
 
     const loadAppointments = useCallback(async () => {
         const token = localStorage.getItem('token');

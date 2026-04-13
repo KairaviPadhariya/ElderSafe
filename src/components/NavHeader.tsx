@@ -1,7 +1,12 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 
-const NavHeader = ({ title, icon, backLink = "/" }) => {
+type NavHeaderProps = {
+  title: string;
+  icon: string;
+  backLink?: string;
+};
+
+const NavHeader = ({ title, icon, backLink = "/" }: NavHeaderProps) => {
   return (
     <div className="nav-header">
       <Link to={backLink} className="back-link">

@@ -1,10 +1,31 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+type ReminderType = 'medication' | 'appointment' | 'health-check';
+type ReminderStatus = 'active' | 'pending' | 'completed';
+type ReminderPriority = 'high' | 'medium' | 'low';
+
+type Reminder = {
+  id: number;
+  title: string;
+  description: string;
+  time: string;
+  type: ReminderType;
+  status: ReminderStatus;
+  icon: string;
+  priority: ReminderPriority;
+};
+
+type ReminderStat = {
+  id: number;
+  value: string;
+  label: string;
+  type: 'active' | 'completed' | 'snoozed' | 'overdue';
+};
 
 const Reminders = () => {
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [reminders, setReminders] = useState([
+  const [activeFilter, setActiveFilter] = useState<'all' | ReminderType>('all');
+  const [reminders, setReminders] = useState<Reminder[]>([
     {
       id: 1,
       title: "Evening Medication",
@@ -57,7 +78,7 @@ const Reminders = () => {
     }
   ]);
 
-  const stats = [
+  const stats: ReminderStat[] = [
     { id: 1, value: "5", label: "Active Reminders", type: "active" },
     { id: 2, value: "98%", label: "Completion Rate", type: "completed" },
     { id: 3, value: "2", label: "Snoozed Today", type: "snoozed" },
@@ -69,11 +90,11 @@ const Reminders = () => {
     return reminder.type === activeFilter;
   });
 
-  const handleSnooze = (id) => {
+  const handleSnooze = (id: number) => {
     alert(`Reminder ${id} snoozed for 30 minutes.`);
   };
 
-  const handleDismiss = (id) => {
+  const handleDismiss = (id: number) => {
     setReminders(reminders.map(reminder =>
       reminder.id === id ? { ...reminder, status: 'completed' } : reminder
     ));
@@ -84,7 +105,7 @@ const Reminders = () => {
     alert('Add New Reminder functionality would open a form in a real application.');
   };
 
-  const getPriorityClass = (priority) => {
+  const getPriorityClass = (priority: ReminderPriority) => {
     switch (priority) {
       case 'high': return 'priority-high-minimal';
       case 'medium': return 'priority-medium-minimal';
@@ -93,7 +114,7 @@ const Reminders = () => {
     }
   };
 
-  const getStatusClass = (status) => {
+  const getStatusClass = (status: ReminderStatus) => {
     switch (status) {
       case 'active': return '';
       case 'pending': return 'pending';

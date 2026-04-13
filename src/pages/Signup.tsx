@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+type SignupRole = 'senior' | 'family' | 'doctor';
+
+type SignupFormData = {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    phone: string;
+    specialization: string;
+};
+
 const Signup = () => {
-    const [role, setRole] = useState('senior');
-    const [formData, setFormData] = useState({
+    const [role, setRole] = useState<SignupRole>('senior');
+    const [formData, setFormData] = useState<SignupFormData>({
         name: '',
         email: '',
         password: '',
@@ -15,11 +26,11 @@ const Signup = () => {
 
     const { login } = useAuth();
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         // Mock registration login
         const userData = {

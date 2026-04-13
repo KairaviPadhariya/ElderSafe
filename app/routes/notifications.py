@@ -50,6 +50,22 @@ def format_relative_time(timestamp: datetime) -> str:
     return timestamp.strftime("%b %d, %Y")
 
 
+def parse_appointment_datetime(appointment: dict) -> datetime | None:
+    date_value = appointment.get("date")
+    time_value = appointment.get("time")
+
+    if not date_value or not time_value:
+        return None
+
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(f"{date_value} {time_value}", fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
 def is_health_log_abnormal(log: dict) -> bool:
     systolic = log.get("systolic_bp")
     diastolic = log.get("diastolic_bp")
@@ -146,13 +162,18 @@ async def get_active_sos_notifications(patient_id: str, label: str):
 
 async def get_upcoming_appointment_notifications(query: dict, label_builder):
     notifications = []
-    today = datetime.utcnow().date().isoformat()
+    now = datetime.utcnow()
+    today = now.date().isoformat()
 
     async for appointment in database.appointments.find({
         **query,
         "status": {"$ne": "cancelled"},
         "date": {"$gte": today}
     }).sort([("date", 1), ("time", 1)]).limit(3):
+        appointment_datetime = parse_appointment_datetime(appointment)
+        if appointment_datetime and appointment_datetime < now:
+            continue
+
         notifications.append(
             build_notification(
                 f"appointment-{appointment['_id']}",
