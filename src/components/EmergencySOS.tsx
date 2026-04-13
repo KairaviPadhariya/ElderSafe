@@ -1,14 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+type EmergencyContact = {
+  id: number;
+  name: string;
+  relationship: string;
+  phone: string;
+  address: string;
+  type: string;
+  icon: string;
+};
+
+type EmergencyService = {
+  id: number;
+  title: string;
+  phone: string;
+  type: string;
+  icon: string;
+};
 
 const EmergencySOS = () => {
   const [countdownActive, setCountdownActive] = useState(false);
   const [seconds, setSeconds] = useState(3);
   const [emergencyActivated, setEmergencyActivated] = useState(false);
-  const [pressTimer, setPressTimer] = useState(null);
+  const [pressTimer, setPressTimer] = useState<number | null>(null);
 
-  const contacts = [
+  const contacts: EmergencyContact[] = [
     {
       id: 1,
       name: "John Smith",
@@ -38,7 +55,7 @@ const EmergencySOS = () => {
     }
   ];
 
-  const services = [
+  const services: EmergencyService[] = [
     {
       id: 1,
       title: "Ambulance",
@@ -62,18 +79,18 @@ const EmergencySOS = () => {
     }
   ];
 
-  const startPress = (e) => {
+  const startPress = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       activateSOS();
     }, 3000);
     setPressTimer(timer);
   };
 
-  const cancelPress = (e) => {
+  const cancelPress = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (pressTimer) {
-      clearTimeout(pressTimer);
+      window.clearTimeout(pressTimer);
       setPressTimer(null);
     }
   };
@@ -91,9 +108,9 @@ const EmergencySOS = () => {
   };
 
   useEffect(() => {
-    let interval;
+    let interval: number | undefined;
     if (countdownActive && seconds > 0) {
-      interval = setInterval(() => {
+      interval = window.setInterval(() => {
         setSeconds(prev => prev - 1);
       }, 1000);
     } else if (seconds === 0 && countdownActive) {
@@ -101,10 +118,14 @@ const EmergencySOS = () => {
       alert('EMERGENCY RESPONSE ACTIVATED!\n\n1. 911 has been called\n2. Emergency contacts notified\n3. Your location shared: 123 Main St, Apt 4B\n4. Medical information sent to responders\n\nStay calm. Help is on the way.');
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+    };
   }, [countdownActive, seconds]);
 
-  const handleContactAction = (action, name, phone) => {
+  const handleContactAction = (action: 'call' | 'message', name: string, phone?: string) => {
     if (action === 'call') {
       if (window.confirm(`Call ${name} at ${phone}?`)) {
         alert(`Calling ${name}...`);
@@ -116,7 +137,7 @@ const EmergencySOS = () => {
     }
   };
 
-  const handleServiceCall = (service) => {
+  const handleServiceCall = (service: string) => {
     if (window.confirm(`Call ${service} emergency line (911)?`)) {
       alert(`Calling 911 for ${service}...`);
     }
