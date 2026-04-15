@@ -70,8 +70,14 @@ async def get_dataset_records(collection_name: str = "senior_safety_dataset", li
 @router.post("/predict")
 async def predict_health_state(request: SafetyPredictionRequest) -> dict:
     model_path = ARTIFACT_DIR / "models" / "best_model.pkl"
-    result = predict_situation(model_path, request.model_dump())
-    return result
+    try:
+        result = predict_situation(model_path, request.model_dump())
+        return result
+    except ValueError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ML model artifact is incompatible with the current feature schema. Retrain the model. Original error: {error}",
+        ) from error
 
 
 @router.post("/monitor")

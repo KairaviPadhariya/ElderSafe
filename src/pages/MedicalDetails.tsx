@@ -22,6 +22,7 @@ type PatientRecord = {
     dbp?: number;
     has_bp?: boolean | null;
     has_diabetes?: boolean | null;
+    has_cardiac_history?: boolean | null;
     fbs?: number | null;
     ppbs?: number | null;
     cholesterol?: number | null;
@@ -57,6 +58,7 @@ type FormData = {
     dbp: string;
     hasBp: string;
     hasDiabetes: string;
+    hasCardiacHistory: string;
     fbs: string;
     ppbs: string;
     cholesterol: string;
@@ -75,6 +77,7 @@ const initialFormData: FormData = {
     dbp: '80',
     hasBp: '',
     hasDiabetes: '',
+    hasCardiacHistory: '',
     fbs: '',
     ppbs: '',
     cholesterol: ''
@@ -134,6 +137,7 @@ function mapPatientToFormData(patient: PatientRecord | null): FormData {
         dbp: patient.dbp !== undefined ? String(patient.dbp) : '',
         hasBp: booleanToYesNo(patient.has_bp),
         hasDiabetes: booleanToYesNo(patient.has_diabetes),
+        hasCardiacHistory: booleanToYesNo(patient.has_cardiac_history),
         fbs: patient.fbs !== undefined && patient.fbs !== null ? String(patient.fbs) : '',
         ppbs: patient.ppbs !== undefined && patient.ppbs !== null ? String(patient.ppbs) : '',
         cholesterol: patient.cholesterol !== undefined && patient.cholesterol !== null ? String(patient.cholesterol) : ''
@@ -463,6 +467,7 @@ function MedicalDetails() {
                     dbp: formData.dbp ? Number(formData.dbp) : null,
                     has_bp: formData.hasBp ? formData.hasBp === 'yes' : null,
                     has_diabetes: formData.hasDiabetes ? formData.hasDiabetes === 'yes' : null,
+                    has_cardiac_history: formData.hasCardiacHistory ? formData.hasCardiacHistory === 'yes' : null,
                     fbs: formData.fbs ? Number(formData.fbs) : null,
                     ppbs: formData.ppbs ? Number(formData.ppbs) : null,
                     cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
@@ -509,6 +514,7 @@ function MedicalDetails() {
     const clinicalRows = [
         { label: 'Blood Pressure', value: yesNoToDisplayValue(formData.hasBp) },
         { label: 'Diabetes', value: yesNoToDisplayValue(formData.hasDiabetes) },
+        { label: 'Cardiac History', value: yesNoToDisplayValue(formData.hasCardiacHistory) },
         { label: 'Fasting Blood Sugar', value: toDisplayValue(formData.fbs) },
         { label: 'Post-Prandial Sugar', value: toDisplayValue(formData.ppbs) },
         { label: 'Cholesterol', value: toDisplayValue(formData.cholesterol) }
@@ -648,6 +654,29 @@ function MedicalDetails() {
                                                 <Scale className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                             </div>
                                         </div>
+
+                                        <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
+                                            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                                <Activity className="w-5 h-5 text-emerald-500" />
+                                                Vital Metrics
+                                            </h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">O2 Saturation (%)</label>
+                                            <input type="number" name="o2Saturation" min="0" max="100" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="98" value={formData.o2Saturation} onChange={handleChange} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Heart Rate (bpm)</label>
+                                            <input type="number" name="heartRate" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="72" value={formData.heartRate} onChange={handleChange} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">SBP (mmHg)</label>
+                                            <input type="number" name="sbp" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="120" value={formData.sbp} onChange={handleChange} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">DBP (mmHg)</label>
+                                            <input type="number" name="dbp" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="80" value={formData.dbp} onChange={handleChange} />
+                                        </div>
                                     </>
                                 )}
 
@@ -670,6 +699,14 @@ function MedicalDetails() {
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diabetes</label>
                                             <select name="hasDiabetes" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasDiabetes} onChange={handleChange}>
+                                                <option value="">Select answer</option>
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cardiac History</label>
+                                            <select name="hasCardiacHistory" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasCardiacHistory} onChange={handleChange}>
                                                 <option value="">Select answer</option>
                                                 <option value="yes">Yes</option>
                                                 <option value="no">No</option>

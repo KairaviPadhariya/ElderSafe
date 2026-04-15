@@ -38,7 +38,6 @@ CATEGORICAL_COLUMNS = ["gender", "bmi_category"]
 BOOLEAN_COLUMNS = [
     "has_hypertension",
     "has_diabetes",
-    "has_copd",
     "has_cardiac_history",
 ]
 

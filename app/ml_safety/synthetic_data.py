@@ -36,13 +36,11 @@ def generate_senior_health_dataset(
 
         has_hypertension = bool(rng.random() < 0.45)
         has_diabetes = bool(rng.random() < 0.35)
-        has_copd = bool(rng.random() < 0.18)
         has_cardiac_history = bool(rng.random() < 0.22)
 
         patient = {
             "has_hypertension": has_hypertension,
             "has_diabetes": has_diabetes,
-            "has_copd": has_copd,
             "has_cardiac_history": has_cardiac_history,
         }
         baseline = derive_personalized_baseline(patient)
@@ -74,7 +72,6 @@ def generate_senior_health_dataset(
             "cholesterol": round(_bounded_normal(rng, baseline.cholesterol + cholesterol_shift, 15, 100, 360), 2),
             "has_hypertension": has_hypertension,
             "has_diabetes": has_diabetes,
-            "has_copd": has_copd,
             "has_cardiac_history": has_cardiac_history,
         }
         row["situation_label"] = classify_risk(row)

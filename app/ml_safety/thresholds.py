@@ -18,13 +18,12 @@ def derive_personalized_baseline(patient: dict) -> PersonalizedBaseline:
     """Shift acceptable vitals based on known disease history."""
     has_hypertension = bool(patient.get("has_hypertension", False))
     has_diabetes = bool(patient.get("has_diabetes", False))
-    has_copd = bool(patient.get("has_copd", False))
     has_cardiac_history = bool(patient.get("has_cardiac_history", False))
 
     sbp = 120 + (10 if has_hypertension else 0) + (5 if has_cardiac_history else 0)
     dbp = 80 + (5 if has_hypertension else 0)
     hr = 72 + (8 if has_cardiac_history else 0)
-    o2_saturation = 98 - (4 if has_copd else 0)
+    o2_saturation = 98
     fbs = 95 + (20 if has_diabetes else 0)
     ppbs = 120 + (40 if has_diabetes else 0)
     cholesterol = 180 + (25 if has_cardiac_history else 0)

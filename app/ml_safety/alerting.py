@@ -6,9 +6,9 @@ from typing import Any
 def build_alert_payload(prediction: str, probabilities: dict[str, float], patient_data: dict[str, Any]) -> dict[str, Any]:
     channels = []
     if prediction == "warning":
-        channels = ["in_app_notification", "email"]
+        channels = ["notification"]
     elif prediction == "emergency":
-        channels = ["in_app_notification", "email", "sms", "doctor_call"]
+        channels = ["notification", "emergency_contact", "sos"]
 
     return {
         "patient_id": patient_data.get("patient_id"),
@@ -26,5 +26,5 @@ def _recommended_action(prediction: str) -> str:
         return "Call emergency contact, notify assigned doctor, and request immediate check-in."
     if prediction == "warning":
         return "Notify family and doctor dashboard, then schedule a follow-up health review."
-    return "Continue monitoring with no escalation."
+    return "Vitals are normal."
 

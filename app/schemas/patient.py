@@ -15,6 +15,7 @@ class PatientCreate(BaseModel):
     dbp: Optional[int] = None
     has_bp: Optional[bool] = None
     has_diabetes: Optional[bool] = None
+    has_cardiac_history: Optional[bool] = None
     fbs: Optional[float] = None
     ppbs: Optional[float] = None
     cholesterol: Optional[float] = None

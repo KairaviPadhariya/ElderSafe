@@ -38,7 +38,7 @@ def normalize_training_dataset(df: pd.DataFrame) -> pd.DataFrame:
     normalized["gender"] = normalized["gender"].astype(str).str.strip().str.lower()
     normalized["situation_label"] = normalized["situation_label"].astype(str).str.strip().str.lower()
 
-    for boolean_column in ["has_hypertension", "has_diabetes", "has_copd", "has_cardiac_history"]:
+    for boolean_column in ["has_hypertension", "has_diabetes", "has_cardiac_history"]:
         if boolean_column not in normalized.columns:
             normalized[boolean_column] = False
 
@@ -57,7 +57,6 @@ def normalize_training_dataset(df: pd.DataFrame) -> pd.DataFrame:
             "cholesterol",
             "has_hypertension",
             "has_diabetes",
-            "has_copd",
             "has_cardiac_history",
             "situation_label",
         ]

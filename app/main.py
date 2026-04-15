@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, client
+from app.ml_safety.router import router as ml_safety_router
 from app.routes import (
     users,
     patients,
@@ -45,6 +46,7 @@ app.include_router(notifications.router)
 app.include_router(prescriptions.router)
 app.include_router(sos.router)
 app.include_router(medical_documents.router)
+app.include_router(ml_safety_router)
 
 
 @app.get("/health")
