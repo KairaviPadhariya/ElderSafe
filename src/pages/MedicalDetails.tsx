@@ -28,6 +28,18 @@ type FamilyRecord = {
     patient_name?: string;
 };
 
+type DailyLogRecord = {
+    log_date: string;
+    systolic_bp?: number;
+    diastolic_bp?: number;
+    heart_rate?: number;
+    o2_saturation?: number;
+    fasting_blood_glucose?: number;
+    post_prandial_glucose?: number;
+    weight?: number;
+    temperature?: number;
+};
+
 type FormData = {
     age: string;
     gender: string;
@@ -171,7 +183,10 @@ function MedicalDetails() {
     const role = localStorage.getItem('userRole') || 'patient';
     const isFamilyView = role === 'family';
     const [loading, setLoading] = useState(false);
+    const [patientLoading, setPatientLoading] = useState(!isFamilyView);
     const [familyLoading, setFamilyLoading] = useState(isFamilyView);
+    const [hasSavedProfile, setHasSavedProfile] = useState(false);
+    const [latestDailyLogDate, setLatestDailyLogDate] = useState('');
     const [error, setError] = useState('');
     const [linkedPatientName, setLinkedPatientName] = useState('');
     const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -198,6 +213,128 @@ function MedicalDetails() {
             setFormData((prev) => ({ ...prev, bmi: '' }));
         }
     }, [formData.height, formData.weight, isFamilyView]);
+
+    useEffect(() => {
+        if (isFamilyView) {
+            return;
+        }
+
+        const loadPatientProfile = async () => {
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                setError('Please log in again to continue.');
+                setPatientLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/patients/me`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const responseText = await response.text();
+                const responseData = responseText ? JSON.parse(responseText) as PatientRecord | { detail?: string } | null : null;
+
+                if (!response.ok) {
+                    throw new Error((responseData as { detail?: string } | null)?.detail || 'Failed to load medical details.');
+                }
+
+                const patientData =
+                    responseData && !('detail' in (responseData as Record<string, unknown>))
+                        ? responseData as PatientRecord
+                        : null;
+
+                setError('');
+                setHasSavedProfile(Boolean(patientData));
+                setFormData(mapPatientToFormData(patientData));
+            } catch (loadError) {
+                console.error('Failed to load patient medical details:', loadError);
+                setError(loadError instanceof Error ? loadError.message : 'Unable to load medical details.');
+                setHasSavedProfile(false);
+                setFormData({ ...initialFormData, sbp: '', dbp: '' });
+            } finally {
+                setPatientLoading(false);
+            }
+        };
+
+        loadPatientProfile();
+    }, [isFamilyView]);
+
+    useEffect(() => {
+        if ((!isFamilyView && patientLoading) || (isFamilyView && familyLoading)) {
+            return;
+        }
+
+        const loadLatestDailyLog = async () => {
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                return;
+            }
+
+            try {
+                let dailyLogsUrl = `${API_BASE_URL}/daily_health_logs`;
+
+                if (isFamilyView) {
+                    const familyResponse = await fetch(`${API_BASE_URL}/family/me`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    });
+
+                    const familyText = await familyResponse.text();
+                    const familyData = familyText ? JSON.parse(familyText) as FamilyRecord | null : null;
+
+                    if (!familyResponse.ok) {
+                        throw new Error((familyData as { detail?: string } | null)?.detail || 'Failed to load family profile.');
+                    }
+
+                    if (familyData?.patient_id) {
+                        dailyLogsUrl = `${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(familyData.patient_id)}`;
+                    }
+                }
+
+                const response = await fetch(dailyLogsUrl, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const responseText = await response.text();
+                const responseData = responseText ? JSON.parse(responseText) as DailyLogRecord[] | { detail?: string } | null : null;
+
+                if (!response.ok) {
+                    throw new Error((responseData as { detail?: string } | null)?.detail || 'Failed to load daily health logs.');
+                }
+
+                const latestLog = Array.isArray(responseData) && responseData.length > 0 ? responseData[0] : null;
+
+                if (!latestLog) {
+                    setLatestDailyLogDate('');
+                    return;
+                }
+
+                setLatestDailyLogDate(latestLog.log_date || '');
+                setFormData((prev) => ({
+                    ...prev,
+                    weight: latestLog.weight !== undefined && latestLog.weight !== null ? String(latestLog.weight) : prev.weight,
+                    o2Saturation: latestLog.o2_saturation !== undefined && latestLog.o2_saturation !== null ? String(latestLog.o2_saturation) : prev.o2Saturation,
+                    heartRate: latestLog.heart_rate !== undefined && latestLog.heart_rate !== null ? String(latestLog.heart_rate) : prev.heartRate,
+                    sbp: latestLog.systolic_bp !== undefined && latestLog.systolic_bp !== null ? String(latestLog.systolic_bp) : prev.sbp,
+                    dbp: latestLog.diastolic_bp !== undefined && latestLog.diastolic_bp !== null ? String(latestLog.diastolic_bp) : prev.dbp,
+                    fbs: latestLog.fasting_blood_glucose !== undefined && latestLog.fasting_blood_glucose !== null ? String(latestLog.fasting_blood_glucose) : prev.fbs,
+                    ppbs: latestLog.post_prandial_glucose !== undefined && latestLog.post_prandial_glucose !== null ? String(latestLog.post_prandial_glucose) : prev.ppbs
+                }));
+            } catch (loadError) {
+                console.error('Failed to load latest daily health log:', loadError);
+            }
+        };
+
+        loadLatestDailyLog();
+    }, [familyLoading, isFamilyView, patientLoading]);
 
     useEffect(() => {
         if (!isFamilyView) {
@@ -310,6 +447,7 @@ function MedicalDetails() {
                 throw new Error(responseData?.detail || 'Failed to save medical details.');
             }
 
+            setHasSavedProfile(true);
             setLoading(false);
             navigate('/dashboard');
         } catch (submitError) {
@@ -319,10 +457,12 @@ function MedicalDetails() {
         }
     };
 
-    const pageTitle = isFamilyView ? 'Patient Overview' : 'Medical Profile';
+    const pageTitle = isFamilyView ? 'Patient Overview' : hasSavedProfile ? 'Saved Medical Profile' : 'Medical Profile';
     const pageDescription = isFamilyView
         ? `Viewing ${linkedPatientName || 'the linked patient'}'s medical details in read-only mode.`
-        : 'Please provide your medical details to help us personalize your health monitoring.';
+        : hasSavedProfile
+            ? 'Your medical details are already saved and only need to be provided once.'
+            : 'Please provide your medical details to help us personalize your health monitoring.';
     const personalRows = [
         { label: 'Age', value: toDisplayValue(formData.age) },
         { label: 'Gender', value: formatGender(formData.gender) },
@@ -342,7 +482,6 @@ function MedicalDetails() {
         { label: 'Post-Prandial Sugar', value: toDisplayValue(formData.ppbs) },
         { label: 'Cholesterol', value: toDisplayValue(formData.cholesterol) }
     ];
-
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
@@ -367,6 +506,12 @@ function MedicalDetails() {
                             <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                                 <Lock className="w-4 h-4" />
                                 Family members can review the linked patient's information here, but cannot edit it.
+                            </div>
+                        )}
+
+                        {latestDailyLogDate && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                                Latest daily vitals shown below are from {latestDailyLogDate}.
                             </div>
                         )}
 
@@ -399,13 +544,13 @@ function MedicalDetails() {
                             </div>
                         )}
 
-                        {familyLoading ? (
+                        {familyLoading || patientLoading ? (
                             <div className="flex justify-center py-16">
                                 <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {isFamilyView ? (
+                                {isFamilyView || hasSavedProfile ? (
                                     <>
                                         <ReadOnlyTableSection
                                             title="Personal Information"
@@ -535,14 +680,15 @@ function MedicalDetails() {
                                         </div>
                                     </>
                                 )}
+
                             </div>
                         )}
 
                         <div className="mt-12 flex items-center justify-end gap-4">
                             <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
-                                {isFamilyView ? 'Back to Dashboard' : 'Skip for now'}
+                                {isFamilyView || hasSavedProfile ? 'Back to Dashboard' : 'Skip for now'}
                             </button>
-                            {!isFamilyView && (
+                            {!isFamilyView && !hasSavedProfile && (
                                 <button type="submit" disabled={loading} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed">
                                     {loading ? (
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
