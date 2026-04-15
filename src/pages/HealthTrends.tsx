@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Droplets, Heart, TrendingUp, Weight } from 'lucide-react';
+import { Activity, Droplets, Heart, TrendingUp, Thermometer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
@@ -172,9 +172,9 @@ function MultiLineChartCard({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <div className="min-w-[760px]">
-              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-[300px]">
+          <div className="w-full">
+            <div className="w-full">
+              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto">
                 {[0, 1, 2, 3].map((index) => {
                   const y = topPadding + (usableHeight / 3) * index;
                   const value = maxValue - (range / 3) * index;
@@ -275,6 +275,7 @@ function HealthTrends() {
   const [linkedPatientName, setLinkedPatientName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [timeRange, setTimeRange] = useState<'weekly' | 'monthly'>('weekly');
 
   const loadLogs = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -325,8 +326,30 @@ function HealthTrends() {
     loadLogs();
   }, [loadLogs]);
 
+  const filteredEntries = useMemo(() => {
+    if (entries.length === 0) return [];
+    
+    // Find latest date in the entries array
+    const latestDateStr = entries[entries.length - 1].log_date;
+    // We add T00:00:00 to parse in local time correctly depending on browser, 
+    // or just use typical string to Date constructor.
+    const latestDate = new Date(`${latestDateStr}T00:00:00`);
+    
+    const cutoffDate = new Date(latestDate);
+    if (timeRange === 'weekly') {
+      cutoffDate.setDate(cutoffDate.getDate() - 6);
+    } else if (timeRange === 'monthly') {
+      cutoffDate.setDate(cutoffDate.getDate() - 29);
+    }
+    
+    return entries.filter(entry => {
+      const entryDate = new Date(`${entry.log_date}T00:00:00`);
+      return entryDate >= cutoffDate;
+    });
+  }, [entries, timeRange]);
+
   const chartData = useMemo(() => {
-    const bloodPressure = entries.map((entry) => ({
+    const bloodPressure = filteredEntries.map((entry) => ({
       label: formatDateLabel(entry.log_date),
       values: [
         { label: 'Systolic', value: entry.systolic_bp, color: '#10b981' },
@@ -334,7 +357,7 @@ function HealthTrends() {
       ],
     }));
 
-    const heartAndOxygen = entries
+    const heartAndOxygen = filteredEntries
       .filter((entry) => entry.o2_saturation != null)
       .map((entry) => ({
         label: formatDateLabel(entry.log_date),
@@ -344,7 +367,7 @@ function HealthTrends() {
         ],
       }));
 
-    const glucose = entries
+    const glucose = filteredEntries
       .filter((entry) => entry.fasting_blood_glucose != null || entry.post_prandial_glucose != null)
       .map((entry) => ({
         label: formatDateLabel(entry.log_date),
@@ -358,15 +381,23 @@ function HealthTrends() {
         ],
       }));
 
-    const bodyMetrics = entries
-      .filter((entry) => entry.weight != null || entry.temperature != null)
-      .map((entry) => ({
-        label: formatDateLabel(entry.log_date),
-        values: [
-          ...(entry.weight != null ? [{ label: 'Weight', value: entry.weight, color: '#14b8a6' }] : []),
-          ...(entry.temperature != null ? [{ label: 'Temperature', value: entry.temperature, color: '#f97316' }] : []),
-        ],
-      }));
+    const bodyMetrics = filteredEntries
+      .filter((entry) => entry.temperature != null)
+      .map((entry) => {
+        let temp = entry.temperature as number;
+        // Normalize: before April 10, temperature was recorded in Fahrenheit
+        if (entry.log_date < '2026-04-10') {
+          // Convert Fahrenheit to Celsius
+          temp = (temp - 32) * (5 / 9);
+        }
+        
+        return {
+          label: formatDateLabel(entry.log_date),
+          values: [
+            { label: 'Temperature', value: Number(temp.toFixed(1)), color: '#f97316' }
+          ],
+        };
+      });
 
     return {
       bloodPressure,
@@ -374,7 +405,7 @@ function HealthTrends() {
       glucose,
       bodyMetrics,
     };
-  }, [entries]);
+  }, [filteredEntries]);
 
   const latestEntry = entries.length > 0 ? entries[entries.length - 1] : undefined;
   const pageSubtitle = isDoctorView
@@ -388,12 +419,36 @@ function HealthTrends() {
       <div className="max-w-6xl mx-auto">
         <BackButton />
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
-            <TrendingUp className="w-8 h-8 text-emerald-500" />
-            Health Trends
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400">{pageSubtitle}</p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
+              <TrendingUp className="w-8 h-8 text-emerald-500" />
+              Health Trends
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400">{pageSubtitle}</p>
+          </div>
+          <div className="flex p-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm w-fit">
+            <button
+              onClick={() => setTimeRange('weekly')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                timeRange === 'weekly'
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setTimeRange('monthly')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                timeRange === 'monthly'
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -457,11 +512,11 @@ function HealthTrends() {
               emptyMessage="Add fasting or post-meal glucose values to see this chart."
             />
             <MultiLineChartCard
-              title="Weight And Temperature"
-              subtitle="Body metrics captured in previous daily logs"
-              icon={Weight}
+              title="Temperature Trends"
+              subtitle="Body temperature recorded in previous daily logs"
+              icon={Thermometer}
               points={chartData.bodyMetrics}
-              emptyMessage="Add weight or temperature entries to see this chart."
+              emptyMessage="Add temperature entries to see this chart."
             />
           </div>
         )}
