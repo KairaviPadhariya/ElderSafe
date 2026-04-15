@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from bson import ObjectId
 from bson.binary import Binary
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
 from app.database import database
@@ -118,6 +118,64 @@ async def resolve_patient_context(current_user: dict) -> tuple[str, list[str]]:
     return primary_patient_id, deduped_aliases
 
 
+async def get_doctor_profile_id(user_id: str) -> str | None:
+    doctor = await database.doctors.find_one({"user_id": user_id})
+
+    if not doctor:
+        return None
+
+    return str(doctor["_id"])
+
+
+async def resolve_requested_patient_context(current_user: dict, requested_patient_id: str | None) -> tuple[str, list[str]]:
+    if current_user.get("role") != "doctor":
+        return await resolve_patient_context(current_user)
+
+    if not requested_patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select a patient before viewing medical documents."
+        )
+
+    doctor_profile_id = await get_doctor_profile_id(current_user["sub"])
+
+    if not doctor_profile_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Complete the doctor profile first to access patient documents."
+        )
+
+    aliases: list[str] = [requested_patient_id]
+    patient_profile = None
+
+    if ObjectId.is_valid(requested_patient_id):
+        patient_profile = await database.patients.find_one({"_id": ObjectId(requested_patient_id)})
+
+    if not patient_profile:
+        patient_profile = await database.patients.find_one({"user_id": requested_patient_id})
+
+    if patient_profile:
+        aliases.append(str(patient_profile["_id"]))
+        if patient_profile.get("user_id"):
+            aliases.append(str(patient_profile["user_id"]))
+
+    deduped_aliases = list(dict.fromkeys([alias for alias in aliases if alias]))
+
+    appointment = await database.appointments.find_one({
+        "doctor_id": doctor_profile_id,
+        "patient_id": {"$in": deduped_aliases}
+    })
+
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view documents for patients linked to your appointments."
+        )
+
+    primary_patient_id = str((patient_profile or {}).get("user_id") or requested_patient_id)
+    return primary_patient_id, deduped_aliases
+
+
 def build_document_access_query(patient_ids: list[str]) -> dict:
     return {
         "$or": [
@@ -193,8 +251,11 @@ async def upload_document(
 
 
 @router.get("/medical-documents")
-async def list_documents(current_user: dict = Depends(verify_token)):
-    _, patient_ids = await resolve_patient_context(current_user)
+async def list_documents(
+    patient_id: str | None = Query(default=None),
+    current_user: dict = Depends(verify_token)
+):
+    _, patient_ids = await resolve_requested_patient_context(current_user, patient_id)
     documents = []
 
     async for document in database.medical_documents.find(build_document_access_query(patient_ids)).sort("uploaded_at", -1):
@@ -204,8 +265,12 @@ async def list_documents(current_user: dict = Depends(verify_token)):
 
 
 @router.get("/medical-documents/{document_id}")
-async def download_document(document_id: str, current_user: dict = Depends(verify_token)):
-    _, patient_ids = await resolve_patient_context(current_user)
+async def download_document(
+    document_id: str,
+    patient_id: str | None = Query(default=None),
+    current_user: dict = Depends(verify_token)
+):
+    _, patient_ids = await resolve_requested_patient_context(current_user, patient_id)
     document = await get_document_for_patient(document_id, patient_ids)
     storage_path = Path(document.get("storage_path") or "")
     media_type = document.get("content_type") or "application/octet-stream"

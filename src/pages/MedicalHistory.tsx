@@ -1,5 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { FileText, Loader2, Upload } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
@@ -107,8 +108,12 @@ async function requestJson(url: string, options: RequestInit = {}) {
 }
 
 function MedicalHistory() {
+    const [searchParams] = useSearchParams();
     const role = localStorage.getItem('userRole') || 'patient';
     const isFamilyView = role === 'family';
+    const isDoctorView = role === 'doctor';
+    const selectedPatientId = searchParams.get('patientId') || '';
+    const selectedPatientName = searchParams.get('patientName') || '';
     const [documents, setDocuments] = useState<MedicalDocument[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(true);
@@ -137,7 +142,13 @@ function MedicalHistory() {
         }
 
         try {
-            const data = await requestJson(`${API_BASE_URL}/medical-documents`, {
+            const url = new URL(`${API_BASE_URL}/medical-documents`);
+
+            if (isDoctorView && selectedPatientId) {
+                url.searchParams.set('patient_id', selectedPatientId);
+            }
+
+            const data = await requestJson(url.toString(), {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -151,7 +162,7 @@ function MedicalHistory() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [isDoctorView, selectedPatientId]);
 
     useEffect(() => {
         loadDocuments();
@@ -227,18 +238,29 @@ function MedicalHistory() {
 
         try {
             const response = await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
+                ...(isDoctorView && selectedPatientId
+                    ? { headers: { Authorization: `Bearer ${token}` } }
+                    : { headers: { Authorization: `Bearer ${token}` } })
+            });
+
+            const previewUrl = new URL(`${API_BASE_URL}/medical-documents/${documentRecord.id}`);
+            if (isDoctorView && selectedPatientId) {
+                previewUrl.searchParams.set('patient_id', selectedPatientId);
+            }
+
+            const previewResponse = await fetch(previewUrl.toString(), {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
             });
 
-            if (!response.ok) {
-                const text = await response.text();
+            if (!previewResponse.ok) {
+                const text = await previewResponse.text();
                 const data = text ? JSON.parse(text) : null;
                 throw new Error(data?.detail || data?.message || 'Preview failed');
             }
 
-            const blob = await response.blob();
+            const blob = await previewResponse.blob();
             const url = window.URL.createObjectURL(blob);
             setPreview((current) => {
                 if (current?.url) {
@@ -259,7 +281,9 @@ function MedicalHistory() {
         }
     };
 
-    const pageSubtitle = isFamilyView
+    const pageSubtitle = isDoctorView
+        ? `View uploaded documents for ${selectedPatientName || 'the selected patient'}.`
+        : isFamilyView
         ? 'View and upload prescription or report files for the linked patient.'
         : 'Upload and keep prescription or report files for later reference.';
 
@@ -289,32 +313,38 @@ function MedicalHistory() {
                 )}
 
                 <div className="mb-8 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
-                    <h2 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">Upload a document</h2>
+                    <h2 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">
+                        {isDoctorView ? 'Patient documents' : 'Upload a document'}
+                    </h2>
                     <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-                        Accepted formats: PDF, JPG, JPEG, PNG. Maximum size: 10 MB.
+                        {isDoctorView
+                            ? 'Open the patient records that have been uploaded and shared for review.'
+                            : 'Accepted formats: PDF, JPG, JPEG, PNG. Maximum size: 10 MB.'}
                     </p>
 
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <input
-                            id="medical-document-file"
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={handleFileChange}
-                            disabled={uploading}
-                            className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-pink-100 file:px-4 file:py-2 file:font-medium file:text-pink-700 hover:file:bg-pink-200 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200"
-                        />
-                        <button
-                            type="button"
-                            onClick={handleUpload}
-                            disabled={uploading || !selectedFile}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white shadow-lg shadow-pink-500/20 transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                        >
-                            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                            {uploading ? 'Uploading...' : 'Upload'}
-                        </button>
-                    </div>
+                    {!isDoctorView && (
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                            <input
+                                id="medical-document-file"
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={handleFileChange}
+                                disabled={uploading}
+                                className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-pink-100 file:px-4 file:py-2 file:font-medium file:text-pink-700 hover:file:bg-pink-200 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleUpload}
+                                disabled={uploading || !selectedFile}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white shadow-lg shadow-pink-500/20 transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                            >
+                                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                                {uploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    )}
 
-                    {selectedFile && (
+                    {!isDoctorView && selectedFile && (
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
                             Selected: <span className="font-medium text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
                         </p>

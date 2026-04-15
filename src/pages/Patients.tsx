@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, TrendingUp } from 'lucide-react';
+import { ChevronRight, FileText, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 
@@ -152,6 +152,15 @@ function Patients() {
     navigate(`/health-trends?${searchParams.toString()}`);
   };
 
+  const openPatientDocuments = (patient: PatientListItem) => {
+    const searchParams = new URLSearchParams({
+      patientId: patient.id,
+      patientName: patient.name,
+    });
+
+    navigate(`/medical-history?${searchParams.toString()}`);
+  };
+
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <BackButton />
@@ -189,25 +198,35 @@ function Patients() {
           <ul className="divide-y divide-slate-100 dark:divide-slate-700">
             {patients.map((patient) => (
               <li key={patient.id}>
-                <button
-                  type="button"
-                  onClick={() => openPatientTrends(patient)}
-                  className="w-full p-6 flex items-center justify-between gap-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/40"
-                >
+                <div className="w-full p-6 flex items-center justify-between gap-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/40">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-slate-900 dark:text-white font-medium">{patient.name}</span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        View trends
-                      </span>
                     </div>
                     <span className="mt-1 block text-slate-500 dark:text-slate-400 text-sm">
                       Last visit: {formatVisitDate(patient.lastVisit)}
                     </span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400" />
-                </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openPatientTrends(patient)}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                    >
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      View trends
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openPatientDocuments(patient)}
+                      className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-2 text-xs font-medium text-pink-700 transition-colors hover:bg-pink-100 dark:bg-pink-900/30 dark:text-pink-300 dark:hover:bg-pink-900/50"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      View documents
+                    </button>
+                    <ChevronRight className="h-5 w-5 text-slate-400" />
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

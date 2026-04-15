@@ -10,6 +10,8 @@ type Appointment = {
     id?: string | number;
     doctor_id?: string;
     doctor_name?: string;
+    patient_id?: string;
+    patient_name?: string;
     specialty?: string;
     date: string;
     time: string;
@@ -17,6 +19,18 @@ type Appointment = {
     location?: string;
     status?: string;
     image?: string;
+};
+
+type DoctorScheduleAppointment = {
+    _id?: string;
+    patient_id?: string;
+    patient_name?: string;
+    date?: string;
+    time?: string;
+};
+
+type DoctorDashboardResponse = {
+    schedule?: DoctorScheduleAppointment[];
 };
 
 type Doctor = {
@@ -118,6 +132,7 @@ function Appointments() {
     const [cancellingId, setCancellingId] = useState<string | number | null>(null);
     const [error, setError] = useState('');
     const [currentTime, setCurrentTime] = useState(() => new Date());
+    const [patientNamesByAppointment, setPatientNamesByAppointment] = useState<Record<string, string>>({});
 
     const visibleAppointments = appointments.filter((appointment) => isUpcomingAppointment(appointment, currentTime));
     const minDate = getTodayDate();
@@ -165,12 +180,48 @@ function Appointments() {
         }
     }, []);
 
+    const loadDoctorPatientNames = useCallback(async () => {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setPatientNamesByAppointment({});
+            return;
+        }
+
+        try {
+            const data = await requestJson(`${API_BASE_URL}/doctors/dashboard`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }) as DoctorDashboardResponse;
+
+            const schedule = Array.isArray(data?.schedule) ? data.schedule : [];
+            const nextMap = schedule.reduce<Record<string, string>>((map, appointment) => {
+                const key = appointment._id ?? `${appointment.date}-${appointment.time}-${appointment.patient_id ?? ''}`;
+                const name = appointment.patient_name || appointment.patient_id || '';
+
+                if (key && name) {
+                    map[key] = name;
+                }
+
+                return map;
+            }, {});
+
+            setPatientNamesByAppointment(nextMap);
+        } catch (loadError) {
+            console.error('Failed to load doctor patient names:', loadError);
+            setPatientNamesByAppointment({});
+        }
+    }, []);
+
     useEffect(() => {
         loadAppointments();
         if (canCreateAppointments) {
             loadDoctors();
+        } else {
+            loadDoctorPatientNames();
         }
-    }, [canCreateAppointments, loadAppointments, loadDoctors]);
+    }, [canCreateAppointments, loadAppointments, loadDoctorPatientNames, loadDoctors]);
 
     const getMinTime = (selectedDate: string) => {
         if (!selectedDate) {
@@ -471,7 +522,9 @@ function Appointments() {
                     <div className="grid gap-4">
                         {visibleAppointments.map((apt) => {
                             const appointmentId = apt._id ?? apt.id ?? `${apt.doctor_name}-${apt.date}-${apt.time}`;
-                            const doctorName = apt.doctor_name || apt.doctor_id || 'Doctor';
+                            const appointmentName = canCreateAppointments
+                                ? (apt.doctor_name || apt.doctor_id || 'Doctor')
+                                : (apt.patient_name || patientNamesByAppointment[String(appointmentId)] || apt.patient_id || 'Patient');
                             const specialty = apt.specialty || apt.reason || 'General appointment';
                             const location = apt.location || 'Location not provided';
 
@@ -530,7 +583,7 @@ function Appointments() {
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{doctorName}</h3>
+                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{appointmentName}</h3>
                                             <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full w-fit">
                                                 {apt.status === 'past' ? 'Past' : 'Upcoming'}
                                             </span>

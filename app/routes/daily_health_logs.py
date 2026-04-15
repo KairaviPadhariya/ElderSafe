@@ -19,19 +19,78 @@ def serialize_health_log(log: dict):
     return log
 
 
+def normalize_name(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+async def find_patient_profile_by_name(patient_name: str | None):
+    if not patient_name:
+        return None
+
+    normalized_query = normalize_name(patient_name)
+    exact_matches: list[dict] = []
+    prefix_matches: list[dict] = []
+
+    async for patient in database.patients.find({}):
+        candidate_name = normalize_name(patient.get("name"))
+        if not candidate_name:
+            continue
+
+        if candidate_name == normalized_query:
+            exact_matches.append(patient)
+        elif normalized_query and candidate_name.startswith(f"{normalized_query} "):
+            prefix_matches.append(patient)
+
+    if exact_matches:
+        return exact_matches[0]
+
+    if len(prefix_matches) == 1:
+        return prefix_matches[0]
+
+    return None
+
+
 async def resolve_patient_id(current_user: dict) -> str:
     if current_user.get("role") != "family":
         return current_user["sub"]
 
     family_record = await database.family.find_one({"user_id": current_user["sub"]})
 
-    if not family_record or not family_record.get("patient_id"):
+    if not family_record:
         raise HTTPException(
             status_code=400,
             detail="Complete the family profile first to link a patient."
         )
 
-    return str(family_record["patient_id"])
+    patient_reference = family_record.get("patient_id")
+    patient_profile = None
+
+    if patient_reference and ObjectId.is_valid(str(patient_reference)):
+        patient_profile = await database.patients.find_one({"_id": ObjectId(str(patient_reference))})
+
+    if not patient_profile and patient_reference:
+        patient_profile = await database.patients.find_one({"user_id": str(patient_reference)})
+
+    if not patient_profile and family_record.get("patient_name"):
+        patient_profile = await find_patient_profile_by_name(family_record.get("patient_name"))
+
+    resolved_patient_id = (
+        str((patient_profile or {}).get("user_id"))
+        if (patient_profile or {}).get("user_id")
+        else str((patient_profile or {}).get("_id"))
+        if (patient_profile or {}).get("_id")
+        else str(patient_reference)
+        if patient_reference
+        else None
+    )
+
+    if not resolved_patient_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Complete the family profile first to link a patient."
+        )
+
+    return resolved_patient_id
 
 
 async def get_doctor_profile_id(user_id: str) -> str | None:

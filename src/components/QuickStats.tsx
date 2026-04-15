@@ -16,6 +16,10 @@ type DailyHealthLog = {
   o2_saturation?: number;
 };
 
+interface QuickStatsProps {
+  patientId?: string | null;
+}
+
 async function requestJson(url: string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -79,7 +83,7 @@ function getMetricStatus(value: number | null, min: number, max: number) {
   return value >= min && value <= max ? 'Normal' : 'Review';
 }
 
-function QuickStats() {
+function QuickStats({ patientId }: QuickStatsProps) {
   const [logs, setLogs] = useState<DailyHealthLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,7 +98,11 @@ function QuickStats() {
       }
 
       try {
-        const data = await requestJson(`${API_BASE_URL}/daily_health_logs`, {
+        const url = patientId
+          ? `${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(patientId)}`
+          : `${API_BASE_URL}/daily_health_logs`;
+
+        const data = await requestJson(url, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -110,7 +118,7 @@ function QuickStats() {
     };
 
     loadWeeklyLogs();
-  }, []);
+  }, [patientId]);
 
   const stats = useMemo(() => {
     const weekStart = getWeekStartDate();
