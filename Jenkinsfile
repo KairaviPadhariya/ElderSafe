@@ -3,41 +3,34 @@ pipeline {
 
     stages {
 
-        stage('Clone Code') {
-            steps {
-                git branch: 'kairavi',
-                url: 'https://github.com/KairaviPadhariya/ElderSafe.git'
-            }
-        }
-
         stage('Build Backend Image') {
             steps {
-                sh 'docker build -t eldersafe-backend -f Dockerfile.backend .'
+                sh '''
+                    pwd
+                    ls
+                    docker build -t eldersafe-backend -f Dockerfile.backend .
+                '''
             }
         }
 
         stage('Build Frontend Image') {
             steps {
-                sh 'docker build -t eldersafe-frontend -f Dockerfile.frontend .'
+                sh '''
+                    docker build -t eldersafe-frontend -f Dockerfile.frontend .
+                '''
             }
         }
 
         stage('Deploy App') {
             steps {
                 sh '''
+                    pwd
+                    ls
+                    cd $WORKSPACE
                     docker-compose down || true
                     docker-compose up -d --build
                 '''
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment Successful!'
-        }
-        failure {
-            echo 'Pipeline Failed!'
         }
     }
 }
