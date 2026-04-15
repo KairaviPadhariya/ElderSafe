@@ -5,31 +5,28 @@ pipeline {
 
         stage('Build Backend Image') {
             steps {
-                sh '''
-                    pwd
-                    ls
-                    docker build -t eldersafe-backend -f Dockerfile.backend .
-                '''
+                dir("${WORKSPACE}") {
+                    sh 'docker build -t eldersafe-backend -f Dockerfile.backend .'
+                }
             }
         }
 
         stage('Build Frontend Image') {
             steps {
-                sh '''
-                    docker build -t eldersafe-frontend -f Dockerfile.frontend .
-                '''
+                dir("${WORKSPACE}") {
+                    sh 'docker build -t eldersafe-frontend -f Dockerfile.frontend .'
+                }
             }
         }
 
         stage('Deploy App') {
             steps {
-                sh '''
-                    pwd
-                    ls
-                    cd $WORKSPACE
-                    docker-compose down || true
-                    docker-compose up -d --build
-                '''
+                dir("${WORKSPACE}") {
+                    sh '''
+                        docker-compose down || true
+                        docker-compose up -d --build
+                    '''
+                }
             }
         }
     }
