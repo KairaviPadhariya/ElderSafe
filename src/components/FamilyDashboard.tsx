@@ -13,6 +13,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
+import HealthRiskPrediction from './HealthRiskPrediction';
 import { getWeeklyAverageVitals, hasSavedPatientLink, resolveLinkedPatient } from '../utils/patientData';
 
 interface Props {
@@ -539,6 +540,17 @@ function FamilyDashboard({ userName }: Props) {
                                 : formatLatestVitalsTime(latestHealthLog)}
                         </p>
                     </div>
+
+                    {linkedPatient ? (
+                        <HealthRiskPrediction
+                            patientId={linkedPatient._id || linkedPatient.user_id || familyRecord?.patient_id || null}
+                            patientName={patientName}
+                            allowAutoSos={false}
+                            heading="Linked patient risk overview"
+                            hideRecommendedAction
+                            hideAlertChannels
+                        />
+                    ) : null}
                 </div>
 
                 <div className="space-y-6">

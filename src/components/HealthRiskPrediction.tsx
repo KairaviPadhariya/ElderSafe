@@ -76,6 +76,15 @@ type RiskHistoryEntry = {
   confidence: number;
 };
 
+interface HealthRiskPredictionProps {
+  patientId?: string | null;
+  patientName?: string;
+  allowAutoSos?: boolean;
+  heading?: string;
+  hideRecommendedAction?: boolean;
+  hideAlertChannels?: boolean;
+}
+
 async function requestText(url: string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -350,13 +359,20 @@ function buildPredictionReasons(result: PredictionResult | null, payload: Predic
     .map((reason) => reason.message);
 }
 
-function HealthRiskPrediction() {
+function HealthRiskPrediction({
+  patientId: targetPatientId,
+  patientName,
+  allowAutoSos = true,
+  heading = 'Current health risk assessment',
+  hideRecommendedAction = false,
+  hideAlertChannels = false
+}: HealthRiskPredictionProps) {
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [dataSourceLabel, setDataSourceLabel] = useState('');
-  const [patientId, setPatientId] = useState<string | undefined>(undefined);
+  const [resolvedPatientId, setResolvedPatientId] = useState<string | undefined>(undefined);
   const [autoSosMessage, setAutoSosMessage] = useState('');
   const [payloadSnapshot, setPayloadSnapshot] = useState<PredictionPayloadSnapshot | null>(null);
   const [missingDataWarnings, setMissingDataWarnings] = useState<string[]>([]);
@@ -365,7 +381,7 @@ function HealthRiskPrediction() {
     const token = localStorage.getItem('token');
 
     if (!token) {
-      setError('Please log in again to view your ML health risk prediction.');
+      setError('Please log in again to view the ML health risk prediction.');
       setResult(null);
       setLoading(false);
       setRefreshing(false);
@@ -379,20 +395,29 @@ function HealthRiskPrediction() {
     }
 
     try {
+      const profileUrl = targetPatientId ? `${API_BASE_URL}/patients` : `${API_BASE_URL}/patients/me`;
+      const logsUrl = targetPatientId
+        ? `${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(targetPatientId)}`
+        : `${API_BASE_URL}/daily_health_logs`;
+
       const [profileData, logsData] = await Promise.all([
-        requestJson(`${API_BASE_URL}/patients/me`, {
+        requestJson(profileUrl, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         }),
-        requestJson(`${API_BASE_URL}/daily_health_logs`, {
+        requestJson(logsUrl, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         })
       ]);
 
-      const profile = (profileData ?? null) as PatientProfile | null;
+      const profile = targetPatientId && Array.isArray(profileData)
+        ? ((profileData as PatientProfile[]).find((entry) => entry._id === targetPatientId)
+          || (profileData as Array<PatientProfile & { user_id?: string }>).find((entry) => entry.user_id === targetPatientId)
+          || null)
+        : (profileData ?? null) as PatientProfile | null;
       const logs = Array.isArray(logsData) ? (logsData as DailyHealthLog[]) : [];
       const latestLog = [...logs]
         .sort((first, second) => {
@@ -400,6 +425,10 @@ function HealthRiskPrediction() {
           const secondTime = getLogTimestamp(second)?.getTime() ?? 0;
           return secondTime - firstTime;
         })[0];
+
+      if (targetPatientId && !profile) {
+        throw new Error('The linked patient profile could not be found for ML prediction.');
+      }
 
       const weight = latestLog?.weight ?? profile?.weight ?? null;
       const bmi = profile?.bmi ?? calculateBmi(weight, profile?.height);
@@ -464,13 +493,18 @@ function HealthRiskPrediction() {
 
       setResult(prediction as PredictionResult);
       setPayloadSnapshot(normalizedPayload);
-      setPatientId(normalizedPayload.patient_id ?? undefined);
-      setDataSourceLabel(latestLog?.log_date ? `Using the latest daily log from ${latestLog.log_date}.` : 'Using your saved profile values.');
+      setResolvedPatientId(normalizedPayload.patient_id ?? targetPatientId ?? undefined);
+      setDataSourceLabel(
+        latestLog?.log_date
+          ? `Using the latest daily log from ${latestLog.log_date}.`
+          : `Using ${targetPatientId ? 'the linked patient' : 'saved'} profile values.`
+      );
       setError('');
     } catch (loadError) {
       console.error('Failed to load prediction:', loadError);
       setResult(null);
       setPayloadSnapshot(null);
+      setResolvedPatientId(targetPatientId ?? undefined);
       setDataSourceLabel('');
       setError(loadError instanceof Error ? loadError.message : 'Unable to load the prediction right now.');
     } finally {
@@ -481,7 +515,7 @@ function HealthRiskPrediction() {
 
   useEffect(() => {
     loadPrediction();
-  }, []);
+  }, [targetPatientId]);
 
   useEffect(() => {
     if (!result) {
@@ -494,7 +528,7 @@ function HealthRiskPrediction() {
       confidence: result.alert.confidence
     };
 
-    const existingHistory = readRiskHistory(patientId);
+    const existingHistory = readRiskHistory(resolvedPatientId);
     const lastEntry = existingHistory[existingHistory.length - 1];
     const sameAsLatest =
       lastEntry
@@ -505,17 +539,22 @@ function HealthRiskPrediction() {
       ? [...existingHistory.slice(0, -1), historyEntry]
       : [...existingHistory, historyEntry].slice(-6);
 
-    writeRiskHistory(patientId, nextHistory);
-  }, [patientId, result]);
+    writeRiskHistory(resolvedPatientId, nextHistory);
+  }, [resolvedPatientId, result]);
 
   useEffect(() => {
+    if (!allowAutoSos) {
+      setAutoSosMessage('');
+      return;
+    }
+
     const processEmergencyStreak = async () => {
-      if (!result || !patientId) {
+      if (!result || !resolvedPatientId) {
         return;
       }
 
-      const streakKey = getPatientStorageKey(patientId, 'emergency-streak');
-      const triggerKey = getPatientStorageKey(patientId, 'last-auto-sos');
+      const streakKey = getPatientStorageKey(resolvedPatientId, 'emergency-streak');
+      const triggerKey = getPatientStorageKey(resolvedPatientId, 'last-auto-sos');
 
       if (result.prediction !== 'emergency') {
         localStorage.setItem(streakKey, '0');
@@ -569,7 +608,7 @@ function HealthRiskPrediction() {
     };
 
     processEmergencyStreak();
-  }, [patientId, result]);
+  }, [allowAutoSos, resolvedPatientId, result]);
 
   const presentation = useMemo(() => {
     const status = result?.prediction ?? 'normal';
@@ -605,6 +644,9 @@ function HealthRiskPrediction() {
     ? Object.entries(result.probabilities).sort((first, second) => second[1] - first[1])
     : [];
   const predictionReasons = buildPredictionReasons(result, payloadSnapshot);
+  const summaryGridClasses = hideAlertChannels
+    ? 'mt-5 grid gap-4 md:grid-cols-2'
+    : 'mt-5 grid gap-4 md:grid-cols-3';
 
   return (
     <section className={`mt-8 mb-8 rounded-3xl border p-6 shadow-sm ${presentation.panelClasses}`}>
@@ -615,8 +657,13 @@ function HealthRiskPrediction() {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-              Current health risk assessment
+              {heading}
             </h3>
+            {patientName ? (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Health prediction for {patientName}.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -669,7 +716,7 @@ function HealthRiskPrediction() {
                 </span>
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className={summaryGridClasses}>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-800/80">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Confidence</p>
                   <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{confidencePercent}%</p>
@@ -678,18 +725,22 @@ function HealthRiskPrediction() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Rule-Based Check</p>
                   <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{toTitleCase(result.rule_based_label)}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-800/80">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Alert Channels</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    {result.alert.channels.length > 0 ? result.alert.channels.map(formatChannel).join(', ') : 'No escalation'}
-                  </p>
-                </div>
+                {!hideAlertChannels ? (
+                  <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-800/80">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Alert Channels</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                      {result.alert.channels.length > 0 ? result.alert.channels.map(formatChannel).join(', ') : 'No escalation'}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/80">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Recommended Action</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">{result.alert.recommended_action}</p>
-              </div>
+              {!hideRecommendedAction ? (
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/80">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Recommended Action</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">{result.alert.recommended_action}</p>
+                </div>
+              ) : null}
 
               {predictionReasons.length > 0 ? (
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/80">
