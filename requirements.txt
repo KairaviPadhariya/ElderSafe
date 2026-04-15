@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+pydantic
+email-validator
+motor
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

@@ -12,6 +12,17 @@ SOS_ACTIVE_WINDOW = timedelta(hours=24)
 NOTIFICATION_RETENTION_WINDOW = timedelta(hours=24)
 
 
+def normalize_name(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+async def user_exists(user_id: str | None) -> bool:
+    if not user_id or not ObjectId.is_valid(user_id):
+        return False
+
+    return await database.users.count_documents({"_id": ObjectId(user_id)}, limit=1) > 0
+
+
 def get_sos_active_cutoff() -> datetime:
     return datetime.utcnow() - SOS_ACTIVE_WINDOW
 
@@ -113,7 +124,29 @@ async def find_patient_profile_by_name(patient_name: str | None):
     if not patient_name:
         return None
 
-    return await database.patients.find_one({"name": patient_name})
+    normalized_query = normalize_name(patient_name)
+    exact_matches: list[dict] = []
+    prefix_matches: list[dict] = []
+
+    async for patient in database.patients.find({}):
+        candidate_name = normalize_name(patient.get("name"))
+        if not candidate_name:
+            continue
+
+        if candidate_name == normalized_query:
+            exact_matches.append(patient)
+        elif normalized_query and candidate_name.startswith(f"{normalized_query} "):
+            prefix_matches.append(patient)
+
+    for patient in exact_matches:
+        if await user_exists(patient.get("user_id")):
+            return patient
+
+    active_prefix_matches = [patient for patient in prefix_matches if await user_exists(patient.get("user_id"))]
+    if len(active_prefix_matches) == 1:
+        return active_prefix_matches[0]
+
+    return exact_matches[0] if exact_matches else None
 
 
 async def resolve_linked_patient_user_id(patient_reference: str | None) -> str | None:
