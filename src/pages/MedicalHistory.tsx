@@ -237,13 +237,13 @@ function MedicalHistory() {
         : 'Upload and keep prescription or report files for later reference.';
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 transition-colors duration-300">
+        <div className="min-h-screen bg-slate-50 px-4 py-6 dark:bg-slate-900 sm:px-6 sm:py-8 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
                 <BackButton />
 
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
-                        <FileText className="w-8 h-8 text-pink-500" />
+                <div className="mb-6 sm:mb-8">
+                    <h1 className="mb-2 flex items-center gap-3 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+                        <FileText className="h-7 w-7 text-pink-500 sm:h-8 sm:w-8" />
                         Medical Documents
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">{pageSubtitle}</p>
@@ -261,7 +261,7 @@ function MedicalHistory() {
                     </div>
                 )}
 
-                <div className="mb-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="mb-8 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
                     <h2 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">Upload a document</h2>
                     <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
                         Accepted formats: PDF, JPG, JPEG, PNG. Maximum size: 10 MB.
@@ -280,7 +280,7 @@ function MedicalHistory() {
                             type="button"
                             onClick={handleUpload}
                             disabled={uploading || !selectedFile}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white shadow-lg shadow-pink-500/20 transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white shadow-lg shadow-pink-500/20 transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                         >
                             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                             {uploading ? 'Uploading...' : 'Upload'}
@@ -294,8 +294,8 @@ function MedicalHistory() {
                     )}
                 </div>
 
-                <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                    <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+                    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Saved documents</h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -329,7 +329,7 @@ function MedicalHistory() {
                                 >
                                     <div className="min-w-0">
                                         <p className="truncate text-base font-semibold text-slate-900 dark:text-white">{documentRecord.filename}</p>
-                                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                        <p className="mt-1 break-words text-sm text-slate-500 dark:text-slate-400">
                                             {formatUploadedAt(documentRecord.uploaded_at)} | {formatFileSize(documentRecord.size)}
                                         </p>
                                     </div>
@@ -343,7 +343,7 @@ function MedicalHistory() {
                 </div>
 
                 {(previewLoading || preview) && (
-                    <div className="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                    <div className="mt-8 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
                         <div className="mb-4">
                             <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Document preview</h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -367,7 +367,7 @@ function MedicalHistory() {
                             <iframe
                                 title="Medical document preview"
                                 src={preview.url}
-                                className="h-[720px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-700"
+                                className="h-[65vh] min-h-[420px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-700 sm:h-[720px]"
                             />
                         ) : (
                             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/40">
