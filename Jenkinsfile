@@ -21,10 +21,12 @@ pipeline {
 
         stage('Deploy App') {
             steps {
-                sh '''
-                docker compose down || true
-                docker compose up -d --build
-                '''
+                dir("${WORKSPACE}") {
+                    sh '''
+                    docker-compose down || true
+                    docker-compose up -d --build
+                    '''
+                }
             }
         }
     }
