@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Clipboard, FileText, Heart, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
+import { Activity, Clipboard, FileText, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
@@ -18,6 +18,8 @@ type PatientRecord = {
     heart_rate?: number;
     sbp?: number;
     dbp?: number;
+    has_bp?: boolean | null;
+    has_diabetes?: boolean | null;
     fbs?: number | null;
     ppbs?: number | null;
     cholesterol?: number | null;
@@ -51,6 +53,8 @@ type FormData = {
     heartRate: string;
     sbp: string;
     dbp: string;
+    hasBp: string;
+    hasDiabetes: string;
     fbs: string;
     ppbs: string;
     cholesterol: string;
@@ -67,6 +71,8 @@ const initialFormData: FormData = {
     heartRate: '',
     sbp: '120',
     dbp: '80',
+    hasBp: '',
+    hasDiabetes: '',
     fbs: '',
     ppbs: '',
     cholesterol: ''
@@ -86,6 +92,22 @@ function formatGender(value: string) {
     }
 
     return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function booleanToYesNo(value?: boolean | null) {
+    if (value === undefined || value === null) {
+        return '';
+    }
+
+    return value ? 'yes' : 'no';
+}
+
+function yesNoToDisplayValue(value: string) {
+    if (!value) {
+        return 'Not provided';
+    }
+
+    return value === 'yes' ? 'Yes' : 'No';
 }
 
 function mapPatientToFormData(patient: PatientRecord | null): FormData {
@@ -108,6 +130,8 @@ function mapPatientToFormData(patient: PatientRecord | null): FormData {
         heartRate: patient.heart_rate !== undefined ? String(patient.heart_rate) : '',
         sbp: patient.sbp !== undefined ? String(patient.sbp) : '',
         dbp: patient.dbp !== undefined ? String(patient.dbp) : '',
+        hasBp: booleanToYesNo(patient.has_bp),
+        hasDiabetes: booleanToYesNo(patient.has_diabetes),
         fbs: patient.fbs !== undefined && patient.fbs !== null ? String(patient.fbs) : '',
         ppbs: patient.ppbs !== undefined && patient.ppbs !== null ? String(patient.ppbs) : '',
         cholesterol: patient.cholesterol !== undefined && patient.cholesterol !== null ? String(patient.cholesterol) : ''
@@ -430,10 +454,12 @@ function MedicalDetails() {
                     weight: Number(formData.weight),
                     bmi: formData.bmi ? Number(formData.bmi) : null,
                     blood_group: formData.bloodGroup,
-                    o2_saturation: Number(formData.o2Saturation),
-                    heart_rate: Number(formData.heartRate),
-                    sbp: Number(formData.sbp),
-                    dbp: Number(formData.dbp),
+                    o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
+                    heart_rate: formData.heartRate ? Number(formData.heartRate) : null,
+                    sbp: formData.sbp ? Number(formData.sbp) : null,
+                    dbp: formData.dbp ? Number(formData.dbp) : null,
+                    has_bp: formData.hasBp ? formData.hasBp === 'yes' : null,
+                    has_diabetes: formData.hasDiabetes ? formData.hasDiabetes === 'yes' : null,
                     fbs: formData.fbs ? Number(formData.fbs) : null,
                     ppbs: formData.ppbs ? Number(formData.ppbs) : null,
                     cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
@@ -478,6 +504,8 @@ function MedicalDetails() {
         { label: 'DBP (mmHg)', value: toDisplayValue(formData.dbp) }
     ];
     const clinicalRows = [
+        { label: 'Blood Pressure', value: yesNoToDisplayValue(formData.hasBp) },
+        { label: 'Diabetes', value: yesNoToDisplayValue(formData.hasDiabetes) },
         { label: 'Fasting Blood Sugar', value: toDisplayValue(formData.fbs) },
         { label: 'Post-Prandial Sugar', value: toDisplayValue(formData.ppbs) },
         { label: 'Cholesterol', value: toDisplayValue(formData.cholesterol) }
@@ -620,51 +648,29 @@ function MedicalDetails() {
                                     </>
                                 )}
 
-                                {!isFamilyView && (
-                                    <>
-                                        <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
-                                            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                                <Activity className="w-5 h-5 text-emerald-500" />
-                                                Vital Metrics
-                                            </h3>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">BMI</label>
-                                            <input type="text" name="bmi" readOnly className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed outline-none" placeholder="Calculated automatically" value={formData.bmi} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">O2 Saturation (%)</label>
-                                            <input type="number" name="o2Saturation" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="98" value={formData.o2Saturation} onChange={handleChange} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Heart Rate (bpm)</label>
-                                            <div className="relative">
-                                                <input type="number" name="heartRate" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11" placeholder="72" value={formData.heartRate} onChange={handleChange} />
-                                                <Heart className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
-                                            </div>
-                                        </div>
-                                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">SBP (mmHg)</label>
-                                                <input type="number" name="sbp" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="120" value={formData.sbp} onChange={handleChange} />
-                                                <p className="text-xs text-slate-500">Systolic Blood Pressure</p>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">DBP (mmHg)</label>
-                                                <input type="number" name="dbp" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="80" value={formData.dbp} onChange={handleChange} />
-                                                <p className="text-xs text-slate-500">Diastolic Blood Pressure</p>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-
-                                {!isFamilyView && (
+                                {!isFamilyView && !hasSavedProfile && (
                                     <>
                                         <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
                                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                                                 <Thermometer className="w-5 h-5 text-emerald-500" />
                                                 Clinical Measurements
                                             </h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Blood Pressure</label>
+                                            <select name="hasBp" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasBp} onChange={handleChange}>
+                                                <option value="">Select answer</option>
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diabetes</label>
+                                            <select name="hasDiabetes" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasDiabetes} onChange={handleChange}>
+                                                <option value="">Select answer</option>
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No</option>
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fasting Blood Sugar</label>
@@ -685,9 +691,11 @@ function MedicalDetails() {
                         )}
 
                         <div className="mt-12 flex items-center justify-end gap-4">
-                            <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
-                                {isFamilyView || hasSavedProfile ? 'Back to Dashboard' : 'Skip for now'}
-                            </button>
+                            {!isFamilyView && !hasSavedProfile && (
+                                <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
+                                    Skip for now
+                                </button>
+                            )}
                             {!isFamilyView && !hasSavedProfile && (
                                 <button type="submit" disabled={loading} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed">
                                     {loading ? (

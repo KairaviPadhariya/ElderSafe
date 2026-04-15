@@ -13,6 +13,7 @@ import DailyLogs from './pages/DailyLogs';
 import DoctorDetails from './pages/DoctorDetails';
 import Doctors from './pages/Doctors';
 import FamilyDetails from './pages/FamilyDetails';
+import ForgotPassword from './pages/ForgotPassword';
 import HealthTrends from './pages/HealthTrends';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login.tsx';
@@ -61,6 +62,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardLayout />} />

@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from bson import ObjectId
+from bson.binary import Binary
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.database import database
 from app.utils.auth import verify_token
@@ -17,14 +18,22 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def serialize_document(document: dict):
+    uploaded_at = document.get("uploaded_at")
+
+    if isinstance(uploaded_at, datetime):
+        if uploaded_at.tzinfo is None:
+            uploaded_at = uploaded_at.replace(tzinfo=timezone.utc)
+        else:
+            uploaded_at = uploaded_at.astimezone(timezone.utc)
+
     return {
         "id": str(document["_id"]),
         "filename": document.get("filename"),
         "content_type": document.get("content_type"),
         "size": document.get("size"),
         "uploaded_at": (
-            document["uploaded_at"].isoformat()
-            if isinstance(document.get("uploaded_at"), datetime)
+            uploaded_at.isoformat().replace("+00:00", "Z")
+            if isinstance(uploaded_at, datetime)
             else document.get("uploaded_at")
         )
     }
@@ -38,7 +47,16 @@ def sanitize_filename(filename: str) -> str:
 async def resolve_patient_context(current_user: dict) -> tuple[str, list[str]]:
     if current_user.get("role") != "family":
         patient_id = current_user["sub"]
-        return patient_id, [patient_id]
+        aliases: list[str] = [patient_id]
+
+        patient_profile = await database.patients.find_one({"user_id": patient_id})
+        if patient_profile:
+            aliases.append(str(patient_profile["_id"]))
+            if patient_profile.get("user_id"):
+                aliases.append(str(patient_profile["user_id"]))
+
+        deduped_aliases = list(dict.fromkeys([alias for alias in aliases if alias]))
+        return patient_id, deduped_aliases
 
     family_record = await database.family.find_one({"user_id": current_user["sub"]})
 
@@ -160,6 +178,7 @@ async def upload_document(
         "storage_path": str(stored_path),
         "content_type": file.content_type or "application/octet-stream",
         "size": len(file_data),
+        "file_bytes": Binary(file_data),
         "uploaded_by": current_user["sub"],
         "uploaded_at": datetime.utcnow()
     }
@@ -189,12 +208,27 @@ async def download_document(document_id: str, current_user: dict = Depends(verif
     _, patient_ids = await resolve_patient_context(current_user)
     document = await get_document_for_patient(document_id, patient_ids)
     storage_path = Path(document.get("storage_path") or "")
+    media_type = document.get("content_type") or "application/octet-stream"
+    filename = document.get("filename") or storage_path.name or "document"
+    file_bytes = document.get("file_bytes")
 
-    if not storage_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stored file was not found.")
+    if file_bytes:
+        return Response(
+            content=bytes(file_bytes),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"'
+            }
+        )
 
-    return FileResponse(
-        path=storage_path,
-        media_type=document.get("content_type") or "application/octet-stream",
-        filename=document.get("filename") or storage_path.name
+    if storage_path.exists():
+        return FileResponse(
+            path=storage_path,
+            media_type=media_type,
+            filename=filename
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Stored file was not found for this legacy upload. Please re-upload it once so it is available across devices."
     )

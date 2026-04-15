@@ -19,6 +19,28 @@ type DocumentPreview = {
     contentType: string;
 };
 
+function inferContentType(filename: string, contentType?: string) {
+    const normalizedContentType = (contentType || '').toLowerCase();
+
+    if (normalizedContentType && normalizedContentType !== 'application/octet-stream') {
+        return normalizedContentType;
+    }
+
+    const extension = filename.split('.').pop()?.toLowerCase();
+
+    switch (extension) {
+        case 'png':
+            return 'image/png';
+        case 'jpg':
+        case 'jpeg':
+            return 'image/jpeg';
+        case 'pdf':
+            return 'application/pdf';
+        default:
+            return normalizedContentType || 'application/octet-stream';
+    }
+}
+
 function formatFileSize(size?: number) {
     if (!size || size < 1024) {
         return `${size || 0} B`;
@@ -36,7 +58,12 @@ function formatUploadedAt(value?: string) {
         return 'Unknown date';
     }
 
-    const parsed = new Date(value);
+    const normalizedValue =
+        /z$|[+-]\d{2}:\d{2}$/i.test(value) || !value.includes('T')
+            ? value
+            : `${value}Z`;
+
+    const parsed = new Date(normalizedValue);
     if (Number.isNaN(parsed.getTime())) {
         return value;
     }
@@ -220,7 +247,7 @@ function MedicalHistory() {
 
                 return {
                     url,
-                    contentType: blob.type || documentRecord.content_type || 'application/octet-stream'
+                    contentType: inferContentType(documentRecord.filename, blob.type || documentRecord.content_type)
                 };
             });
         } catch (previewError) {
