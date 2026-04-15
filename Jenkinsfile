@@ -25,10 +25,19 @@ pipeline {
         stage('Deploy App') {
             steps {
                 sh '''
-                docker-compose down || true
-                docker-compose up -d --build
+                    docker-compose down || true
+                    docker-compose up -d --build
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment Successful!'
+        }
+        failure {
+            echo 'Pipeline Failed!'
         }
     }
 }
