@@ -1,12 +1,10 @@
 import {
     Activity,
-    AlertCircle,
     AlertTriangle,
     Droplets,
     FileText,
     Heart,
     MapPin,
-    Phone,
     ShieldCheck,
     Stethoscope,
     TrendingUp,
@@ -45,6 +43,8 @@ type PatientRecord = {
     o2_saturation?: number;
     sbp?: number;
     dbp?: number;
+    fbs?: number | null;
+    ppbs?: number | null;
     bmi?: number | null;
     phone?: string | null;
     address?: string | null;
@@ -55,6 +55,18 @@ type SOSAlert = {
     location?: string | null;
     status?: string;
     created_at?: string;
+};
+
+type DailyHealthLog = {
+    log_date?: string;
+    updated_at?: string;
+    heart_rate?: number;
+    o2_saturation?: number;
+    systolic_bp?: number;
+    diastolic_bp?: number;
+    fasting_blood_glucose?: number;
+    post_prandial_glucose?: number;
+    weight?: number;
 };
 
 async function requestJson(url: string, options: RequestInit = {}) {
@@ -140,6 +152,14 @@ function resolveLinkedPatient(patients: PatientRecord[], familyRecord: FamilyRec
     return null;
 }
 
+function hasSavedPatientLink(familyRecord: FamilyRecord | null) {
+    if (!familyRecord) {
+        return false;
+    }
+
+    return Boolean((familyRecord.patient_id || '').trim() || (familyRecord.patient_name || '').trim());
+}
+
 function getVitalsStatus(patient: PatientRecord | null) {
     if (!patient) {
         return {
@@ -187,12 +207,55 @@ function formatSosTime(timestamp?: string) {
     });
 }
 
+function getMapEmbedUrl(address?: string | null) {
+    if (!address || address === 'Address not provided') {
+        return '';
+    }
+
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+}
+
+function formatMeasurement(value?: number | null, suffix = '') {
+    if (value === undefined || value === null) {
+        return 'Not provided';
+    }
+
+    return `${value}${suffix}`;
+}
+
+function formatBloodPressure(systolic?: number | null, diastolic?: number | null) {
+    if (systolic === undefined || systolic === null || diastolic === undefined || diastolic === null) {
+        return 'Not provided';
+    }
+
+    return `${systolic}/${diastolic} mmHg`;
+}
+
+function formatLatestVitalsTime(log?: DailyHealthLog | null) {
+    if (!log?.updated_at && !log?.log_date) {
+        return 'No recent vitals recorded';
+    }
+
+    const updatedTime = parseServerTimestamp(log.updated_at);
+    if (updatedTime) {
+        return `Last updated ${updatedTime.toLocaleString([], {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        })}`;
+    }
+
+    return log.log_date ? `Recorded on ${log.log_date}` : 'No recent vitals recorded';
+}
+
 function FamilyDashboard({ userName }: Props) {
     const navigate = useNavigate();
     const [name, setName] = useState('User');
     const [familyRecord, setFamilyRecord] = useState<FamilyRecord | null>(null);
     const [linkedPatient, setLinkedPatient] = useState<PatientRecord | null>(null);
     const [activeSosAlert, setActiveSosAlert] = useState<SOSAlert | null>(null);
+    const [latestHealthLog, setLatestHealthLog] = useState<DailyHealthLog | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -244,7 +307,10 @@ function FamilyDashboard({ userName }: Props) {
                     })
                 ]);
 
-                const resolvedFamilyRecord = familyData as FamilyRecord | null;
+                const resolvedFamilyRecord =
+                    familyData && typeof familyData === 'object'
+                        ? (familyData as FamilyRecord)
+                        : null;
                 const patients = Array.isArray(patientsData) ? (patientsData as PatientRecord[]) : [];
                 const sosAlerts = Array.isArray(sosData) ? (sosData as SOSAlert[]) : [];
 
@@ -254,23 +320,38 @@ function FamilyDashboard({ userName }: Props) {
 
                 setFamilyRecord(resolvedFamilyRecord);
 
-                if (!resolvedFamilyRecord) {
+                if (!hasSavedPatientLink(resolvedFamilyRecord)) {
                     setLinkedPatient(null);
+                    setLatestHealthLog(null);
                     setError('Complete the family profile first to link this dashboard to a patient.');
                     return;
                 }
 
                 const matchedPatient = resolveLinkedPatient(patients, resolvedFamilyRecord);
-
                 const unresolvedAlerts = sosAlerts.filter((alert) => alert.status !== 'resolved');
+                const patientId = matchedPatient?._id || matchedPatient?.user_id || resolvedFamilyRecord.patient_id;
+                let latestLog: DailyHealthLog | null = null;
+
+                if (patientId) {
+                    const dailyLogsData = await requestJson(`${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(patientId)}`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    });
+
+                    const logs = Array.isArray(dailyLogsData) ? (dailyLogsData as DailyHealthLog[]) : [];
+                    latestLog = logs[0] ?? null;
+                }
 
                 setLinkedPatient(matchedPatient);
                 setActiveSosAlert(unresolvedAlerts[0] ?? null);
+                setLatestHealthLog(latestLog);
                 setError(matchedPatient ? '' : 'The linked patient record could not be found in the database.');
             } catch (loadError) {
                 console.error('Failed to load family dashboard:', loadError);
                 if (isMounted) {
                     setError(loadError instanceof Error ? loadError.message : 'Unable to load linked patient details.');
+                    setLatestHealthLog(null);
                 }
             } finally {
                 if (isMounted) {
@@ -310,44 +391,52 @@ function FamilyDashboard({ userName }: Props) {
     const relationLabel = familyRecord?.relation || 'Caregiver';
     const accessLevel = familyRecord?.access_level || 'Not provided';
     const patientAddress = linkedPatient?.address || familyRecord?.address || 'Address not provided';
+    const patientMapUrl = getMapEmbedUrl(patientAddress);
     const patientPhone = linkedPatient?.phone || familyRecord?.phone || 'Not provided';
-    const vitalsStatus = getVitalsStatus(linkedPatient);
     const sosStatusTitle = activeSosAlert ? 'SOS alert triggered' : 'SOS Status';
     const sosStatusMessage = activeSosAlert
         ? `${patientName} triggered SOS on ${formatSosTime(activeSosAlert.created_at)}.${activeSosAlert.location ? ` Location: ${activeSosAlert.location}.` : ''}`
         : 'No emergency alerts triggered recently.';
-    const vitalsCards = [
-        {
-            label: 'Heart Rate',
-            value: linkedPatient?.heart_rate ? `${linkedPatient.heart_rate} bpm` : 'Not provided',
-            icon: Heart
-        },
-        {
-            label: 'O2 Saturation',
-            value: linkedPatient?.o2_saturation ? `${linkedPatient.o2_saturation}%` : 'Not provided',
-            icon: Activity
-        },
-        {
-            label: 'Blood Pressure',
-            value:
-                linkedPatient?.sbp !== undefined && linkedPatient?.dbp !== undefined
-                    ? `${linkedPatient.sbp}/${linkedPatient.dbp} mmHg`
-                    : 'Not provided',
-            icon: TrendingUp
-        },
-        {
-            label: 'Blood Group',
-            value: linkedPatient?.blood_group || 'Not provided',
-            icon: Droplets
-        }
-    ];
+    const latestHeartRate = latestHealthLog?.heart_rate ?? linkedPatient?.heart_rate ?? null;
+    const latestOxygen = latestHealthLog?.o2_saturation ?? linkedPatient?.o2_saturation ?? null;
+    const latestSystolic = latestHealthLog?.systolic_bp ?? linkedPatient?.sbp ?? null;
+    const latestDiastolic = latestHealthLog?.diastolic_bp ?? linkedPatient?.dbp ?? null;
+    const latestGlucose =
+        latestHealthLog?.fasting_blood_glucose
+        ?? latestHealthLog?.post_prandial_glucose
+        ?? linkedPatient?.fbs
+        ?? linkedPatient?.ppbs
+        ?? null;
     const patientSummary = [
         { label: 'Patient Name', value: patientName },
         { label: 'Age', value: linkedPatient?.age ? `${linkedPatient.age}` : 'Not provided' },
         { label: 'Gender', value: formatGender(linkedPatient?.gender) },
+        { label: 'Blood Group', value: linkedPatient?.blood_group || 'Not provided' },
         { label: 'BMI', value: linkedPatient?.bmi ? `${linkedPatient.bmi}` : 'Not provided' },
         { label: 'Relation', value: relationLabel },
         { label: 'Access Level', value: accessLevel }
+    ];
+    const healthSnapshotCards = [
+        {
+            label: 'Heart Rate',
+            value: formatMeasurement(latestHeartRate, ' bpm'),
+            icon: Heart
+        },
+        {
+            label: 'O2 Saturation',
+            value: formatMeasurement(latestOxygen, '%'),
+            icon: Activity
+        },
+        {
+            label: 'Blood Pressure',
+            value: formatBloodPressure(latestSystolic, latestDiastolic),
+            icon: TrendingUp
+        },
+        {
+            label: 'Blood Sugar',
+            value: formatMeasurement(latestGlucose, ' mg/dL'),
+            icon: Droplets
+        }
     ];
 
     return (
@@ -379,7 +468,7 @@ function FamilyDashboard({ userName }: Props) {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="mb-8">
                 <div className={`rounded-2xl p-6 shadow-sm border flex items-center gap-4 ${activeSosAlert
                     ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900'
                     : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'
@@ -401,20 +490,6 @@ function FamilyDashboard({ userName }: Props) {
                             }`}>{sosStatusMessage}</p>
                     </div>
                 </div>
-
-                <div className="bg-rose-50 dark:bg-rose-900/20 rounded-2xl p-6 border border-rose-100 dark:border-rose-900/30">
-                    <h3 className="font-bold text-rose-700 dark:text-rose-400 mb-2 flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5" /> Emergency
-                    </h3>
-                    <p className="text-rose-600/80 dark:text-rose-300/60 text-sm mb-4">
-                        Quick access to emergency support.
-                    </p>
-                    <div className="grid grid-cols-1 gap-3">
-                        <button className="bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 py-2 px-3 rounded-xl text-sm font-semibold shadow-sm border border-rose-100 dark:border-rose-900 flex items-center justify-center gap-2">
-                            <Phone className="w-4 h-4" /> 102
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -425,10 +500,10 @@ function FamilyDashboard({ userName }: Props) {
                                 <div className="bg-white/20 p-2 rounded-xl">
                                     <Activity className="w-6 h-6 text-white" />
                                 </div>
-                                <span className="font-medium text-emerald-50">Current Vitals Status</span>
+                                <span className="font-medium text-emerald-50">Linked Patient Status</span>
                             </div>
-                            <h3 className="text-4xl font-bold mb-2">{vitalsStatus.title}</h3>
-                            <p className="text-emerald-100">{vitalsStatus.subtitle}</p>
+                            <h3 className="text-4xl font-bold mb-2">{getVitalsStatus(linkedPatient).title}</h3>
+                            <p className="text-emerald-100">{getVitalsStatus(linkedPatient).subtitle}</p>
                         </div>
                         <Heart className="absolute -bottom-8 -right-8 w-64 h-64 text-white opacity-10" />
                     </div>
@@ -452,9 +527,12 @@ function FamilyDashboard({ userName }: Props) {
                     </div>
 
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-sm border border-slate-100 dark:border-slate-700">
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Current Health Snapshot</h3>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Health Snapshot</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                            Showing the linked patient's latest recorded vitals and profile values.
+                        </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {vitalsCards.map((item) => {
+                            {healthSnapshotCards.map((item) => {
                                 const Icon = item.icon;
 
                                 return (
@@ -470,6 +548,9 @@ function FamilyDashboard({ userName }: Props) {
                                 );
                             })}
                         </div>
+                        <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
+                            {formatLatestVitalsTime(latestHealthLog)}
+                        </p>
                     </div>
                 </div>
 
@@ -508,10 +589,22 @@ function FamilyDashboard({ userName }: Props) {
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Address</p>
                                 <p className="font-semibold text-slate-900 dark:text-white">{patientAddress}</p>
                             </div>
-                            <div className="bg-slate-100 dark:bg-slate-700 rounded-xl h-32 flex items-center justify-center text-slate-400">
-                                <MapPin className="w-8 h-8 mr-2" />
-                                <span>Map unavailable</span>
-                            </div>
+                            {patientMapUrl ? (
+                                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <iframe
+                                        title="Patient location map"
+                                        src={patientMapUrl}
+                                        className="h-40 w-full"
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="bg-slate-100 dark:bg-slate-700 rounded-xl h-32 flex items-center justify-center text-slate-400">
+                                    <MapPin className="w-8 h-8 mr-2" />
+                                    <span>Map unavailable</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

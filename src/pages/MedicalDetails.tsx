@@ -206,6 +206,7 @@ function MedicalDetails() {
     const navigate = useNavigate();
     const role = localStorage.getItem('userRole') || 'patient';
     const isFamilyView = role === 'family';
+    const [showFamilyPatientInfo, setShowFamilyPatientInfo] = useState(false);
     const [loading, setLoading] = useState(false);
     const [patientLoading, setPatientLoading] = useState(!isFamilyView);
     const [familyLoading, setFamilyLoading] = useState(isFamilyView);
@@ -404,6 +405,7 @@ function MedicalDetails() {
                 if (!familyData) {
                     setError('Complete the family profile first to link this dashboard to a patient.');
                     setFormData(mapPatientToFormData(null));
+                    setShowFamilyPatientInfo(false);
                     return;
                 }
 
@@ -414,11 +416,13 @@ function MedicalDetails() {
 
                 setLinkedPatientName(matchedPatient?.name || familyData.patient_name || '');
                 setFormData(mapPatientToFormData(matchedPatient));
+                setShowFamilyPatientInfo(false);
                 setError(matchedPatient ? '' : 'The linked patient record could not be found in the database.');
             } catch (loadError) {
                 console.error('Failed to load linked patient medical details:', loadError);
                 setError(loadError instanceof Error ? loadError.message : 'Unable to load linked patient details.');
                 setFormData(mapPatientToFormData(null));
+                setShowFamilyPatientInfo(false);
             } finally {
                 setFamilyLoading(false);
             }
@@ -551,7 +555,7 @@ function MedicalDetails() {
                                     buttonLabel="View Patient Info"
                                     accentClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
                                     icon={<User className="h-6 w-6" />}
-                                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                                    onClick={() => setShowFamilyPatientInfo(true)}
                                 />
                                 <FamilyQuickCard
                                     title="Medical Documents"
@@ -576,7 +580,7 @@ function MedicalDetails() {
                             <div className="flex justify-center py-16">
                                 <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
                             </div>
-                        ) : (
+                        ) : isFamilyView && !showFamilyPatientInfo ? null : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {isFamilyView || hasSavedProfile ? (
                                     <>
