@@ -237,7 +237,7 @@ function MedicalHistory() {
         setSelectedDocumentId(documentRecord.id);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
+            await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
                 ...(isDoctorView && selectedPatientId
                     ? { headers: { Authorization: `Bearer ${token}` } }
                     : { headers: { Authorization: `Bearer ${token}` } })

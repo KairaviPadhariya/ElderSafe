@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Clipboard, FileText, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { resolveLinkedPatient } from '../utils/patientData';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
 type PatientRecord = {
     _id: string;
+    user_id?: string;
     name?: string;
     age?: number;
     gender?: string;
@@ -409,10 +411,7 @@ function MedicalDetails() {
                     return;
                 }
 
-                const matchedPatient =
-                    patientsData.find((patient) => patient._id === familyData.patient_id) ||
-                    patientsData.find((patient) => patient.name === familyData.patient_name) ||
-                    null;
+                const matchedPatient = resolveLinkedPatient(patientsData, familyData);
 
                 setLinkedPatientName(matchedPatient?.name || familyData.patient_name || '');
                 setFormData(mapPatientToFormData(matchedPatient));

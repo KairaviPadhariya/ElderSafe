@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Heart, Activity, Droplet, Stethoscope } from 'lucide-react';
 
+import { getWeeklyAverageVitals } from '../utils/patientData';
+
 const API_BASE_URL = 'http://127.0.0.1:8000';
 const REQUEST_TIMEOUT_MS = 12000;
-const WEEK_IN_DAYS = 7;
 
 type DailyHealthLog = {
   _id?: string;
@@ -47,32 +48,6 @@ async function requestJson(url: string, options: RequestInit = {}) {
   } finally {
     window.clearTimeout(timeoutId);
   }
-}
-
-function getWeekStartDate() {
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(now.getDate() - (WEEK_IN_DAYS - 1));
-  return start;
-}
-
-function getLogDate(logDate?: string) {
-  if (!logDate) {
-    return null;
-  }
-
-  const parsed = new Date(`${logDate}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function roundAverage(values: number[]) {
-  if (values.length === 0) {
-    return null;
-  }
-
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return Math.round(total / values.length);
 }
 
 function getMetricStatus(value: number | null, min: number, max: number) {
@@ -121,33 +96,14 @@ function QuickStats({ patientId }: QuickStatsProps) {
   }, [patientId]);
 
   const stats = useMemo(() => {
-    const weekStart = getWeekStartDate();
-    const weeklyLogs = logs.filter((log) => {
-      const logDate = getLogDate(log.log_date);
-      return logDate ? logDate >= weekStart : false;
-    });
-
-    const heartRates = weeklyLogs
-      .map((log) => log.heart_rate)
-      .filter((value): value is number => typeof value === 'number');
-    const systolicValues = weeklyLogs
-      .map((log) => log.systolic_bp)
-      .filter((value): value is number => typeof value === 'number');
-    const diastolicValues = weeklyLogs
-      .map((log) => log.diastolic_bp)
-      .filter((value): value is number => typeof value === 'number');
-    const glucoseValues = weeklyLogs
-      .flatMap((log) => [log.fasting_blood_glucose, log.post_prandial_glucose])
-      .filter((value): value is number => typeof value === 'number');
-    const oxygenValues = weeklyLogs
-      .map((log) => log.o2_saturation)
-      .filter((value): value is number => typeof value === 'number');
-
-    const averageHeartRate = roundAverage(heartRates);
-    const averageSystolic = roundAverage(systolicValues);
-    const averageDiastolic = roundAverage(diastolicValues);
-    const averageGlucose = roundAverage(glucoseValues);
-    const averageOxygen = roundAverage(oxygenValues);
+    const {
+      weeklyLogs,
+      averageHeartRate,
+      averageSystolic,
+      averageDiastolic,
+      averageGlucose,
+      averageOxygen,
+    } = getWeeklyAverageVitals(logs);
     const weeklySummary = weeklyLogs.length === 1 ? '1 entry this week' : `${weeklyLogs.length} entries this week`;
 
     return [

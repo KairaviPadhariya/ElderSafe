@@ -19,6 +19,22 @@ def serialize_health_log(log: dict):
     return log
 
 
+def parse_log_timestamp(log: dict) -> datetime:
+    for field in ("updated_at", "created_at"):
+        value = log.get(field)
+        if isinstance(value, datetime):
+            return value
+
+        if isinstance(value, str):
+            normalized = value.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(normalized)
+            except ValueError:
+                continue
+
+    return datetime.min
+
+
 def normalize_name(value: str | None) -> str:
     return " ".join((value or "").strip().lower().split())
 
@@ -50,9 +66,45 @@ async def find_patient_profile_by_name(patient_name: str | None):
     return None
 
 
-async def resolve_patient_id(current_user: dict) -> str:
+def dedupe_preserve_order(values: list[str | None]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+
+    for value in values:
+        normalized = str(value).strip() if value is not None else ""
+        if not normalized or normalized in seen:
+            continue
+
+        seen.add(normalized)
+        ordered.append(normalized)
+
+    return ordered
+
+
+async def build_patient_aliases_from_profile(
+    patient_profile: dict | None,
+    patient_reference: str | None = None
+) -> tuple[str | None, list[str]]:
+    aliases = dedupe_preserve_order([
+        str(patient_profile.get("user_id")) if patient_profile and patient_profile.get("user_id") else None,
+        str(patient_profile.get("_id")) if patient_profile and patient_profile.get("_id") else None,
+        patient_reference,
+    ])
+
+    primary_patient_id = aliases[0] if aliases else None
+    return primary_patient_id, aliases
+
+
+async def resolve_patient_context(current_user: dict) -> tuple[str, list[str]]:
     if current_user.get("role") != "family":
-        return current_user["sub"]
+        patient_profile = await database.patients.find_one({"user_id": current_user["sub"]})
+        primary_patient_id, aliases = await build_patient_aliases_from_profile(patient_profile, current_user["sub"])
+
+        if not primary_patient_id:
+            primary_patient_id = current_user["sub"]
+            aliases = [current_user["sub"]]
+
+        return primary_patient_id, aliases
 
     family_record = await database.family.find_one({"user_id": current_user["sub"]})
 
@@ -74,23 +126,18 @@ async def resolve_patient_id(current_user: dict) -> str:
     if not patient_profile and family_record.get("patient_name"):
         patient_profile = await find_patient_profile_by_name(family_record.get("patient_name"))
 
-    resolved_patient_id = (
-        str((patient_profile or {}).get("user_id"))
-        if (patient_profile or {}).get("user_id")
-        else str((patient_profile or {}).get("_id"))
-        if (patient_profile or {}).get("_id")
-        else str(patient_reference)
-        if patient_reference
-        else None
+    resolved_patient_id, aliases = await build_patient_aliases_from_profile(
+        patient_profile,
+        str(patient_reference) if patient_reference else None
     )
 
-    if not resolved_patient_id:
+    if not resolved_patient_id or not aliases:
         raise HTTPException(
             status_code=400,
             detail="Complete the family profile first to link a patient."
         )
 
-    return resolved_patient_id
+    return resolved_patient_id, aliases
 
 
 async def get_doctor_profile_id(user_id: str) -> str | None:
@@ -102,7 +149,7 @@ async def get_doctor_profile_id(user_id: str) -> str | None:
     return str(doctor["_id"])
 
 
-async def resolve_requested_patient_id(current_user: dict, requested_patient_id: str | None) -> str:
+async def resolve_requested_patient_context(current_user: dict, requested_patient_id: str | None) -> tuple[str, list[str]]:
     role = current_user.get("role")
 
     if role == "doctor":
@@ -125,9 +172,13 @@ async def resolve_requested_patient_id(current_user: dict, requested_patient_id:
 
         if ObjectId.is_valid(requested_patient_id):
             patient_profile = await database.patients.find_one({"_id": ObjectId(requested_patient_id)})
+        if not patient_profile:
+            patient_profile = await database.patients.find_one({"user_id": requested_patient_id})
 
         if patient_profile and patient_profile.get("user_id"):
             allowed_patient_ids.add(str(patient_profile["user_id"]))
+        if patient_profile and patient_profile.get("_id"):
+            allowed_patient_ids.add(str(patient_profile["_id"]))
 
         appointment = await database.appointments.find_one({
             "doctor_id": doctor_profile_id,
@@ -140,9 +191,10 @@ async def resolve_requested_patient_id(current_user: dict, requested_patient_id:
                 detail="You can only view health logs for patients linked to your appointments."
             )
 
-        return requested_patient_id
+        primary_patient_id = str((patient_profile or {}).get("user_id") or requested_patient_id)
+        return primary_patient_id, dedupe_preserve_order(list(allowed_patient_ids))
 
-    return await resolve_patient_id(current_user)
+    return await resolve_patient_context(current_user)
 
 
 @router.post("/daily_health_logs")
@@ -151,7 +203,7 @@ async def create_health_log(
     current_user: dict = Depends(verify_token)
 ):
     log_dict = log.dict(exclude_none=True)
-    patient_id = await resolve_patient_id(current_user)
+    patient_id, patient_aliases = await resolve_patient_context(current_user)
     now = datetime.utcnow()
 
     update_fields = {
@@ -163,7 +215,7 @@ async def create_health_log(
     try:
         await database.daily_health_logs.update_one(
             {
-                "patient_id": patient_id,
+                "patient_id": {"$in": patient_aliases},
                 "log_date": log.log_date
             },
             {
@@ -195,18 +247,27 @@ async def get_health_logs(
     log_date: str | None = Query(default=None),
     current_user: dict = Depends(verify_token)
 ):
-    resolved_patient_id = await resolve_requested_patient_id(current_user, patient_id)
-    query = {"patient_id": resolved_patient_id}
+    _, patient_aliases = await resolve_requested_patient_context(current_user, patient_id)
+    query = {"patient_id": {"$in": patient_aliases}}
 
     if log_date:
         query["log_date"] = log_date
 
-    logs = []
+    logs_by_date: dict[str, dict] = {}
 
     try:
-        async for log in database.daily_health_logs.find(query).sort("log_date", -1):
-            logs.append(serialize_health_log(log))
+        async for log in database.daily_health_logs.find(query).sort([("log_date", -1), ("updated_at", -1), ("created_at", -1)]):
+            serialized_log = serialize_health_log(log)
+            log_date_value = serialized_log.get("log_date")
+
+            if not log_date_value:
+                continue
+
+            existing_log = logs_by_date.get(log_date_value)
+            if not existing_log or parse_log_timestamp(serialized_log) >= parse_log_timestamp(existing_log):
+                logs_by_date[log_date_value] = serialized_log
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load daily health logs: {exc}")
 
+    logs = sorted(logs_by_date.values(), key=lambda item: item.get("log_date", ""), reverse=True)
     return logs

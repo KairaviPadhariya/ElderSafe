@@ -6,6 +6,24 @@ import BackButton from '../components/BackButton';
 const API_BASE_URL = 'http://127.0.0.1:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
+const DEFAULT_TIMES_BY_FREQUENCY: Record<string, string[]> = {
+  'Once daily': ['08:00'],
+  'Twice daily': ['08:00', '20:00'],
+  'Thrice daily': ['08:00', '14:00', '20:00'],
+  'Three times daily': ['08:00', '14:00', '20:00'],
+  'Four times daily': ['06:00', '12:00', '18:00', '22:00'],
+  'As needed': ['08:00'],
+};
+
+function getDefaultTimesForFrequency(frequency: string) {
+  return [...(DEFAULT_TIMES_BY_FREQUENCY[frequency] || ['08:00'])];
+}
+
+function normalizeTimesForFrequency(currentTimes: string[], frequency: string) {
+  const defaultTimes = getDefaultTimesForFrequency(frequency);
+  return defaultTimes.map((defaultTime, index) => currentTimes[index] || defaultTime);
+}
+
 type Medication = {
   _id: string;
   medicine_name: string;
@@ -85,7 +103,7 @@ function Medications() {
     medicine_name: '',
     dosage: '',
     frequency: 'Once daily',
-    times: '08:00',
+    times: getDefaultTimesForFrequency('Once daily'),
     instructions: '',
     start_date: new Date().toISOString().slice(0, 10),
     duration_days: '30'
@@ -128,7 +146,24 @@ function Medications() {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
+
+    if (name === 'frequency') {
+      setFormData((current) => ({
+        ...current,
+        frequency: value,
+        times: normalizeTimesForFrequency(current.times, value),
+      }));
+      return;
+    }
+
     setFormData((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleTimeChange = (index: number, value: string) => {
+    setFormData((current) => ({
+      ...current,
+      times: current.times.map((time, timeIndex) => (timeIndex === index ? value : time)),
+    }));
   };
 
   const handleCreateMedication = async (event: React.FormEvent) => {
@@ -144,7 +179,6 @@ function Medications() {
 
     try {
       const times = formData.times
-        .split(',')
         .map((value) => value.trim())
         .filter(Boolean);
 
@@ -169,7 +203,7 @@ function Medications() {
         medicine_name: '',
         dosage: '',
         frequency: 'Once daily',
-        times: '08:00',
+        times: getDefaultTimesForFrequency('Once daily'),
         instructions: '',
         start_date: new Date().toISOString().slice(0, 10),
         duration_days: '30'
@@ -286,17 +320,30 @@ function Medications() {
               >
                 <option>Once daily</option>
                 <option>Twice daily</option>
+                <option>Thrice daily</option>
                 <option>Three times daily</option>
                 <option>Four times daily</option>
                 <option>As needed</option>
               </select>
-              <input
-                name="times"
-                value={formData.times}
-                onChange={handleInputChange}
-                placeholder="Dose times, comma separated e.g. 08:00,20:00"
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 px-4 py-3">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">Dose times</p>
+                <div className="space-y-3">
+                  {formData.times.map((time, index) => (
+                    <div key={`${formData.frequency}-${index}`} className="flex items-center gap-3">
+                      <label className="w-24 text-sm text-slate-500 dark:text-slate-400">
+                        Dose {index + 1}
+                      </label>
+                      <input
+                        type="time"
+                        value={time}
+                        onChange={(event) => handleTimeChange(index, event.target.value)}
+                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-4 py-2.5 dark:text-white outline-none"
+                        required
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
               <input
                 type="date"
                 name="start_date"
@@ -346,6 +393,9 @@ function Medications() {
           <div className="rounded-2xl bg-white dark:bg-slate-800 p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
             <p className="text-sm text-slate-500 dark:text-slate-400">Next dose</p>
             <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{nextDoseLabel}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              After you mark one dose as taken, this updates to the next scheduled time automatically.
+            </p>
           </div>
         </div>
 

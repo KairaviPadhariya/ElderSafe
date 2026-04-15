@@ -13,6 +13,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
+import { getWeeklyAverageVitals, hasSavedPatientLink, resolveLinkedPatient } from '../utils/patientData';
+
 interface Props {
     userName?: string;
 }
@@ -106,10 +108,6 @@ function formatGender(gender?: string) {
     return gender.charAt(0).toUpperCase() + gender.slice(1);
 }
 
-function normalizeName(value?: string | null) {
-    return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 function parseServerTimestamp(value?: string) {
     if (!value) {
         return null;
@@ -121,71 +119,47 @@ function parseServerTimestamp(value?: string) {
     return Number.isNaN(timestamp.getTime()) ? null : timestamp;
 }
 
-function resolveLinkedPatient(patients: PatientRecord[], familyRecord: FamilyRecord | null) {
-    if (!familyRecord) {
-        return null;
+function getVitalsStatus(
+    patient: PatientRecord | null,
+    averages: {
+        averageHeartRate: number | null;
+        averageOxygen: number | null;
+        averageSystolic: number | null;
+        averageDiastolic: number | null;
     }
-
-    const directMatch =
-        patients.find((patient) => patient._id === familyRecord.patient_id) ||
-        patients.find((patient) => patient.user_id === familyRecord.patient_id);
-
-    if (directMatch) {
-        return directMatch;
-    }
-
-    const familyPatientName = normalizeName(familyRecord.patient_name);
-    if (!familyPatientName) {
-        return null;
-    }
-
-    const exactNameMatch = patients.find((patient) => normalizeName(patient.name) === familyPatientName);
-    if (exactNameMatch) {
-        return exactNameMatch;
-    }
-
-    const prefixMatches = patients.filter((patient) => normalizeName(patient.name).startsWith(`${familyPatientName} `));
-    if (prefixMatches.length === 1) {
-        return prefixMatches[0];
-    }
-
-    return null;
-}
-
-function hasSavedPatientLink(familyRecord: FamilyRecord | null) {
-    if (!familyRecord) {
-        return false;
-    }
-
-    return Boolean((familyRecord.patient_id || '').trim() || (familyRecord.patient_name || '').trim());
-}
-
-function getVitalsStatus(patient: PatientRecord | null) {
-    if (!patient) {
+) {
+    if (!patient && averages.averageHeartRate === null && averages.averageOxygen === null && averages.averageSystolic === null && averages.averageDiastolic === null) {
         return {
             title: 'Patient not linked yet',
             subtitle: 'Complete the family profile to connect this dashboard to a patient record.'
         };
     }
 
-    const heartRateOk = patient.heart_rate !== undefined && patient.heart_rate >= 60 && patient.heart_rate <= 100;
-    const o2Ok = patient.o2_saturation !== undefined && patient.o2_saturation >= 95;
+    const heartRate = averages.averageHeartRate ?? patient?.heart_rate;
+    const oxygen = averages.averageOxygen ?? patient?.o2_saturation;
+    const systolic = averages.averageSystolic ?? patient?.sbp;
+    const diastolic = averages.averageDiastolic ?? patient?.dbp;
+
+    const heartRateOk = heartRate !== undefined && heartRate !== null && heartRate >= 60 && heartRate <= 100;
+    const o2Ok = oxygen !== undefined && oxygen !== null && oxygen >= 95;
     const bpOk =
-        patient.sbp !== undefined &&
-        patient.dbp !== undefined &&
-        patient.sbp < 140 &&
-        patient.dbp < 90;
+        systolic !== undefined &&
+        systolic !== null &&
+        diastolic !== undefined &&
+        diastolic !== null &&
+        systolic < 140 &&
+        diastolic < 90;
 
     if (heartRateOk && o2Ok && bpOk) {
         return {
             title: 'Stable & Normal',
-            subtitle: `Heart Rate: ${patient.heart_rate} bpm | O2 Level: ${patient.o2_saturation}%`
+            subtitle: `Heart Rate: ${heartRate} bpm | O2 Level: ${oxygen}%`
         };
     }
 
     return {
         title: 'Needs Attention',
-        subtitle: `BP ${patient.sbp ?? '--'}/${patient.dbp ?? '--'} mmHg | Heart Rate ${patient.heart_rate ?? '--'} bpm`
+        subtitle: `BP ${systolic ?? '--'}/${diastolic ?? '--'} mmHg | Heart Rate ${heartRate ?? '--'} bpm`
     };
 }
 
@@ -256,6 +230,7 @@ function FamilyDashboard({ userName }: Props) {
     const [linkedPatient, setLinkedPatient] = useState<PatientRecord | null>(null);
     const [activeSosAlert, setActiveSosAlert] = useState<SOSAlert | null>(null);
     const [latestHealthLog, setLatestHealthLog] = useState<DailyHealthLog | null>(null);
+    const [patientLogs, setPatientLogs] = useState<DailyHealthLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -323,6 +298,15 @@ function FamilyDashboard({ userName }: Props) {
                 if (!hasSavedPatientLink(resolvedFamilyRecord)) {
                     setLinkedPatient(null);
                     setLatestHealthLog(null);
+                    setPatientLogs([]);
+                    setError('Complete the family profile first to link this dashboard to a patient.');
+                    return;
+                }
+
+                if (!resolvedFamilyRecord) {
+                    setLinkedPatient(null);
+                    setLatestHealthLog(null);
+                    setPatientLogs([]);
                     setError('Complete the family profile first to link this dashboard to a patient.');
                     return;
                 }
@@ -341,6 +325,9 @@ function FamilyDashboard({ userName }: Props) {
 
                     const logs = Array.isArray(dailyLogsData) ? (dailyLogsData as DailyHealthLog[]) : [];
                     latestLog = logs[0] ?? null;
+                    setPatientLogs(logs);
+                } else {
+                    setPatientLogs([]);
                 }
 
                 setLinkedPatient(matchedPatient);
@@ -352,6 +339,7 @@ function FamilyDashboard({ userName }: Props) {
                 if (isMounted) {
                     setError(loadError instanceof Error ? loadError.message : 'Unable to load linked patient details.');
                     setLatestHealthLog(null);
+                    setPatientLogs([]);
                 }
             } finally {
                 if (isMounted) {
@@ -397,16 +385,13 @@ function FamilyDashboard({ userName }: Props) {
     const sosStatusMessage = activeSosAlert
         ? `${patientName} triggered SOS on ${formatSosTime(activeSosAlert.created_at)}.${activeSosAlert.location ? ` Location: ${activeSosAlert.location}.` : ''}`
         : 'No emergency alerts triggered recently.';
-    const latestHeartRate = latestHealthLog?.heart_rate ?? linkedPatient?.heart_rate ?? null;
-    const latestOxygen = latestHealthLog?.o2_saturation ?? linkedPatient?.o2_saturation ?? null;
-    const latestSystolic = latestHealthLog?.systolic_bp ?? linkedPatient?.sbp ?? null;
-    const latestDiastolic = latestHealthLog?.diastolic_bp ?? linkedPatient?.dbp ?? null;
-    const latestGlucose =
-        latestHealthLog?.fasting_blood_glucose
-        ?? latestHealthLog?.post_prandial_glucose
-        ?? linkedPatient?.fbs
-        ?? linkedPatient?.ppbs
-        ?? null;
+    const weeklyAverages = getWeeklyAverageVitals(patientLogs);
+    const averageHeartRate = weeklyAverages.averageHeartRate ?? linkedPatient?.heart_rate ?? null;
+    const averageOxygen = weeklyAverages.averageOxygen ?? linkedPatient?.o2_saturation ?? null;
+    const averageSystolic = weeklyAverages.averageSystolic ?? linkedPatient?.sbp ?? null;
+    const averageDiastolic = weeklyAverages.averageDiastolic ?? linkedPatient?.dbp ?? null;
+    const averageGlucose = weeklyAverages.averageGlucose ?? linkedPatient?.fbs ?? linkedPatient?.ppbs ?? null;
+    const vitalsStatus = getVitalsStatus(linkedPatient, weeklyAverages);
     const patientSummary = [
         { label: 'Patient Name', value: patientName },
         { label: 'Age', value: linkedPatient?.age ? `${linkedPatient.age}` : 'Not provided' },
@@ -418,23 +403,23 @@ function FamilyDashboard({ userName }: Props) {
     ];
     const healthSnapshotCards = [
         {
-            label: 'Heart Rate',
-            value: formatMeasurement(latestHeartRate, ' bpm'),
+            label: 'Avg Heart Rate',
+            value: formatMeasurement(averageHeartRate, ' bpm'),
             icon: Heart
         },
         {
-            label: 'O2 Saturation',
-            value: formatMeasurement(latestOxygen, '%'),
+            label: 'Avg O2 Saturation',
+            value: formatMeasurement(averageOxygen, '%'),
             icon: Activity
         },
         {
-            label: 'Blood Pressure',
-            value: formatBloodPressure(latestSystolic, latestDiastolic),
+            label: 'Avg Blood Pressure',
+            value: formatBloodPressure(averageSystolic, averageDiastolic),
             icon: TrendingUp
         },
         {
-            label: 'Blood Sugar',
-            value: formatMeasurement(latestGlucose, ' mg/dL'),
+            label: 'Avg Blood Sugar',
+            value: formatMeasurement(averageGlucose, ' mg/dL'),
             icon: Droplets
         }
     ];
@@ -502,8 +487,8 @@ function FamilyDashboard({ userName }: Props) {
                                 </div>
                                 <span className="font-medium text-emerald-50">Linked Patient Status</span>
                             </div>
-                            <h3 className="text-4xl font-bold mb-2">{getVitalsStatus(linkedPatient).title}</h3>
-                            <p className="text-emerald-100">{getVitalsStatus(linkedPatient).subtitle}</p>
+                            <h3 className="text-4xl font-bold mb-2">{vitalsStatus.title}</h3>
+                            <p className="text-emerald-100">{vitalsStatus.subtitle}</p>
                         </div>
                         <Heart className="absolute -bottom-8 -right-8 w-64 h-64 text-white opacity-10" />
                     </div>
@@ -529,7 +514,7 @@ function FamilyDashboard({ userName }: Props) {
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-sm border border-slate-100 dark:border-slate-700">
                         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Health Snapshot</h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                            Showing the linked patient's latest recorded vitals and profile values.
+                            Showing the same 7-day average vitals used on the patient dashboard.
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {healthSnapshotCards.map((item) => {
@@ -549,7 +534,9 @@ function FamilyDashboard({ userName }: Props) {
                             })}
                         </div>
                         <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
-                            {formatLatestVitalsTime(latestHealthLog)}
+                            {weeklyAverages.weeklyLogs.length > 0
+                                ? `${weeklyAverages.weeklyLogs.length} daily entr${weeklyAverages.weeklyLogs.length === 1 ? 'y' : 'ies'} included this week. ${formatLatestVitalsTime(latestHealthLog)}`
+                                : formatLatestVitalsTime(latestHealthLog)}
                         </p>
                     </div>
                 </div>
