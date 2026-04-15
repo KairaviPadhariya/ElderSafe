@@ -19,15 +19,22 @@ type EmergencyService = {
   icon: string;
 };
 
+type PatientEmergencyProfile = {
+  emergency_contact_phone?: string | null;
+};
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 const EmergencySOS = () => {
   const [countdownActive, setCountdownActive] = useState(false);
   const [seconds, setSeconds] = useState(3);
   const [emergencyActivated, setEmergencyActivated] = useState(false);
   const [pressTimer, setPressTimer] = useState<number | null>(null);
+  const [profileContact, setProfileContact] = useState<EmergencyContact | null>(null);
 
-  const contacts: EmergencyContact[] = [
+  const fallbackContacts: EmergencyContact[] = [
     {
-      id: 1,
+      id: 2,
       name: "John Smith",
       relationship: "Son / Primary Contact",
       phone: "(555) 123-4567",
@@ -36,7 +43,7 @@ const EmergencySOS = () => {
       icon: "fas fa-user"
     },
     {
-      id: 2,
+      id: 3,
       name: "Sarah Johnson",
       relationship: "Daughter / Secondary Contact",
       phone: "(555) 987-6543",
@@ -45,7 +52,7 @@ const EmergencySOS = () => {
       icon: "fas fa-user-female"
     },
     {
-      id: 3,
+      id: 4,
       name: "Dr. Williams",
       relationship: "Primary Physician",
       phone: "(555) 456-7890",
@@ -54,6 +61,47 @@ const EmergencySOS = () => {
       icon: "fas fa-user-md"
     }
   ];
+
+  useEffect(() => {
+    const loadEmergencyContact = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/patients/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const responseText = await response.text();
+        const patientData = responseText ? JSON.parse(responseText) as PatientEmergencyProfile | null : null;
+
+        if (!response.ok || !patientData?.emergency_contact_phone) {
+          return;
+        }
+
+        setProfileContact({
+          id: 1,
+          name: 'Emergency Contact',
+          relationship: 'Primary Contact',
+          phone: patientData.emergency_contact_phone,
+          address: 'Saved from profile',
+          type: 'primary',
+          icon: 'fas fa-user'
+        });
+      } catch (error) {
+        console.error('Failed to load emergency contact:', error);
+      }
+    };
+
+    loadEmergencyContact();
+  }, []);
+
+  const contacts = profileContact ? [profileContact, ...fallbackContacts] : fallbackContacts;
 
   const services: EmergencyService[] = [
     {

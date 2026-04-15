@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Clipboard, FileText, Heart, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
+import { Activity, Clipboard, FileText, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
@@ -18,6 +18,8 @@ type PatientRecord = {
     heart_rate?: number;
     sbp?: number;
     dbp?: number;
+    has_bp?: boolean | null;
+    has_diabetes?: boolean | null;
     fbs?: number | null;
     ppbs?: number | null;
     cholesterol?: number | null;
@@ -26,6 +28,18 @@ type PatientRecord = {
 type FamilyRecord = {
     patient_id?: string;
     patient_name?: string;
+};
+
+type DailyLogRecord = {
+    log_date: string;
+    systolic_bp?: number;
+    diastolic_bp?: number;
+    heart_rate?: number;
+    o2_saturation?: number;
+    fasting_blood_glucose?: number;
+    post_prandial_glucose?: number;
+    weight?: number;
+    temperature?: number;
 };
 
 type FormData = {
@@ -39,6 +53,8 @@ type FormData = {
     heartRate: string;
     sbp: string;
     dbp: string;
+    hasBp: string;
+    hasDiabetes: string;
     fbs: string;
     ppbs: string;
     cholesterol: string;
@@ -55,6 +71,8 @@ const initialFormData: FormData = {
     heartRate: '',
     sbp: '120',
     dbp: '80',
+    hasBp: '',
+    hasDiabetes: '',
     fbs: '',
     ppbs: '',
     cholesterol: ''
@@ -74,6 +92,22 @@ function formatGender(value: string) {
     }
 
     return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function booleanToYesNo(value?: boolean | null) {
+    if (value === undefined || value === null) {
+        return '';
+    }
+
+    return value ? 'yes' : 'no';
+}
+
+function yesNoToDisplayValue(value: string) {
+    if (!value) {
+        return 'Not provided';
+    }
+
+    return value === 'yes' ? 'Yes' : 'No';
 }
 
 function mapPatientToFormData(patient: PatientRecord | null): FormData {
@@ -96,6 +130,8 @@ function mapPatientToFormData(patient: PatientRecord | null): FormData {
         heartRate: patient.heart_rate !== undefined ? String(patient.heart_rate) : '',
         sbp: patient.sbp !== undefined ? String(patient.sbp) : '',
         dbp: patient.dbp !== undefined ? String(patient.dbp) : '',
+        hasBp: booleanToYesNo(patient.has_bp),
+        hasDiabetes: booleanToYesNo(patient.has_diabetes),
         fbs: patient.fbs !== undefined && patient.fbs !== null ? String(patient.fbs) : '',
         ppbs: patient.ppbs !== undefined && patient.ppbs !== null ? String(patient.ppbs) : '',
         cholesterol: patient.cholesterol !== undefined && patient.cholesterol !== null ? String(patient.cholesterol) : ''
@@ -171,7 +207,10 @@ function MedicalDetails() {
     const role = localStorage.getItem('userRole') || 'patient';
     const isFamilyView = role === 'family';
     const [loading, setLoading] = useState(false);
+    const [patientLoading, setPatientLoading] = useState(!isFamilyView);
     const [familyLoading, setFamilyLoading] = useState(isFamilyView);
+    const [hasSavedProfile, setHasSavedProfile] = useState(false);
+    const [latestDailyLogDate, setLatestDailyLogDate] = useState('');
     const [error, setError] = useState('');
     const [linkedPatientName, setLinkedPatientName] = useState('');
     const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -198,6 +237,128 @@ function MedicalDetails() {
             setFormData((prev) => ({ ...prev, bmi: '' }));
         }
     }, [formData.height, formData.weight, isFamilyView]);
+
+    useEffect(() => {
+        if (isFamilyView) {
+            return;
+        }
+
+        const loadPatientProfile = async () => {
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                setError('Please log in again to continue.');
+                setPatientLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/patients/me`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const responseText = await response.text();
+                const responseData = responseText ? JSON.parse(responseText) as PatientRecord | { detail?: string } | null : null;
+
+                if (!response.ok) {
+                    throw new Error((responseData as { detail?: string } | null)?.detail || 'Failed to load medical details.');
+                }
+
+                const patientData =
+                    responseData && !('detail' in (responseData as Record<string, unknown>))
+                        ? responseData as PatientRecord
+                        : null;
+
+                setError('');
+                setHasSavedProfile(Boolean(patientData));
+                setFormData(mapPatientToFormData(patientData));
+            } catch (loadError) {
+                console.error('Failed to load patient medical details:', loadError);
+                setError(loadError instanceof Error ? loadError.message : 'Unable to load medical details.');
+                setHasSavedProfile(false);
+                setFormData({ ...initialFormData, sbp: '', dbp: '' });
+            } finally {
+                setPatientLoading(false);
+            }
+        };
+
+        loadPatientProfile();
+    }, [isFamilyView]);
+
+    useEffect(() => {
+        if ((!isFamilyView && patientLoading) || (isFamilyView && familyLoading)) {
+            return;
+        }
+
+        const loadLatestDailyLog = async () => {
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                return;
+            }
+
+            try {
+                let dailyLogsUrl = `${API_BASE_URL}/daily_health_logs`;
+
+                if (isFamilyView) {
+                    const familyResponse = await fetch(`${API_BASE_URL}/family/me`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    });
+
+                    const familyText = await familyResponse.text();
+                    const familyData = familyText ? JSON.parse(familyText) as FamilyRecord | null : null;
+
+                    if (!familyResponse.ok) {
+                        throw new Error((familyData as { detail?: string } | null)?.detail || 'Failed to load family profile.');
+                    }
+
+                    if (familyData?.patient_id) {
+                        dailyLogsUrl = `${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(familyData.patient_id)}`;
+                    }
+                }
+
+                const response = await fetch(dailyLogsUrl, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const responseText = await response.text();
+                const responseData = responseText ? JSON.parse(responseText) as DailyLogRecord[] | { detail?: string } | null : null;
+
+                if (!response.ok) {
+                    throw new Error((responseData as { detail?: string } | null)?.detail || 'Failed to load daily health logs.');
+                }
+
+                const latestLog = Array.isArray(responseData) && responseData.length > 0 ? responseData[0] : null;
+
+                if (!latestLog) {
+                    setLatestDailyLogDate('');
+                    return;
+                }
+
+                setLatestDailyLogDate(latestLog.log_date || '');
+                setFormData((prev) => ({
+                    ...prev,
+                    weight: latestLog.weight !== undefined && latestLog.weight !== null ? String(latestLog.weight) : prev.weight,
+                    o2Saturation: latestLog.o2_saturation !== undefined && latestLog.o2_saturation !== null ? String(latestLog.o2_saturation) : prev.o2Saturation,
+                    heartRate: latestLog.heart_rate !== undefined && latestLog.heart_rate !== null ? String(latestLog.heart_rate) : prev.heartRate,
+                    sbp: latestLog.systolic_bp !== undefined && latestLog.systolic_bp !== null ? String(latestLog.systolic_bp) : prev.sbp,
+                    dbp: latestLog.diastolic_bp !== undefined && latestLog.diastolic_bp !== null ? String(latestLog.diastolic_bp) : prev.dbp,
+                    fbs: latestLog.fasting_blood_glucose !== undefined && latestLog.fasting_blood_glucose !== null ? String(latestLog.fasting_blood_glucose) : prev.fbs,
+                    ppbs: latestLog.post_prandial_glucose !== undefined && latestLog.post_prandial_glucose !== null ? String(latestLog.post_prandial_glucose) : prev.ppbs
+                }));
+            } catch (loadError) {
+                console.error('Failed to load latest daily health log:', loadError);
+            }
+        };
+
+        loadLatestDailyLog();
+    }, [familyLoading, isFamilyView, patientLoading]);
 
     useEffect(() => {
         if (!isFamilyView) {
@@ -293,10 +454,12 @@ function MedicalDetails() {
                     weight: Number(formData.weight),
                     bmi: formData.bmi ? Number(formData.bmi) : null,
                     blood_group: formData.bloodGroup,
-                    o2_saturation: Number(formData.o2Saturation),
-                    heart_rate: Number(formData.heartRate),
-                    sbp: Number(formData.sbp),
-                    dbp: Number(formData.dbp),
+                    o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
+                    heart_rate: formData.heartRate ? Number(formData.heartRate) : null,
+                    sbp: formData.sbp ? Number(formData.sbp) : null,
+                    dbp: formData.dbp ? Number(formData.dbp) : null,
+                    has_bp: formData.hasBp ? formData.hasBp === 'yes' : null,
+                    has_diabetes: formData.hasDiabetes ? formData.hasDiabetes === 'yes' : null,
                     fbs: formData.fbs ? Number(formData.fbs) : null,
                     ppbs: formData.ppbs ? Number(formData.ppbs) : null,
                     cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
@@ -310,6 +473,7 @@ function MedicalDetails() {
                 throw new Error(responseData?.detail || 'Failed to save medical details.');
             }
 
+            setHasSavedProfile(true);
             setLoading(false);
             navigate('/dashboard');
         } catch (submitError) {
@@ -319,10 +483,12 @@ function MedicalDetails() {
         }
     };
 
-    const pageTitle = isFamilyView ? 'Patient Overview' : 'Medical Profile';
+    const pageTitle = isFamilyView ? 'Patient Overview' : hasSavedProfile ? 'Saved Medical Profile' : 'Medical Profile';
     const pageDescription = isFamilyView
         ? `Viewing ${linkedPatientName || 'the linked patient'}'s medical details in read-only mode.`
-        : 'Please provide your medical details to help us personalize your health monitoring.';
+        : hasSavedProfile
+            ? 'Your medical details are already saved and only need to be provided once.'
+            : 'Please provide your medical details to help us personalize your health monitoring.';
     const personalRows = [
         { label: 'Age', value: toDisplayValue(formData.age) },
         { label: 'Gender', value: formatGender(formData.gender) },
@@ -338,11 +504,12 @@ function MedicalDetails() {
         { label: 'DBP (mmHg)', value: toDisplayValue(formData.dbp) }
     ];
     const clinicalRows = [
+        { label: 'Blood Pressure', value: yesNoToDisplayValue(formData.hasBp) },
+        { label: 'Diabetes', value: yesNoToDisplayValue(formData.hasDiabetes) },
         { label: 'Fasting Blood Sugar', value: toDisplayValue(formData.fbs) },
         { label: 'Post-Prandial Sugar', value: toDisplayValue(formData.ppbs) },
         { label: 'Cholesterol', value: toDisplayValue(formData.cholesterol) }
     ];
-
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
@@ -367,6 +534,12 @@ function MedicalDetails() {
                             <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                                 <Lock className="w-4 h-4" />
                                 Family members can review the linked patient's information here, but cannot edit it.
+                            </div>
+                        )}
+
+                        {latestDailyLogDate && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                                Latest daily vitals shown below are from {latestDailyLogDate}.
                             </div>
                         )}
 
@@ -399,13 +572,13 @@ function MedicalDetails() {
                             </div>
                         )}
 
-                        {familyLoading ? (
+                        {familyLoading || patientLoading ? (
                             <div className="flex justify-center py-16">
                                 <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {isFamilyView ? (
+                                {isFamilyView || hasSavedProfile ? (
                                     <>
                                         <ReadOnlyTableSection
                                             title="Personal Information"
@@ -475,51 +648,29 @@ function MedicalDetails() {
                                     </>
                                 )}
 
-                                {!isFamilyView && (
-                                    <>
-                                        <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
-                                            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                                <Activity className="w-5 h-5 text-emerald-500" />
-                                                Vital Metrics
-                                            </h3>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">BMI</label>
-                                            <input type="text" name="bmi" readOnly className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed outline-none" placeholder="Calculated automatically" value={formData.bmi} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">O2 Saturation (%)</label>
-                                            <input type="number" name="o2Saturation" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="98" value={formData.o2Saturation} onChange={handleChange} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Heart Rate (bpm)</label>
-                                            <div className="relative">
-                                                <input type="number" name="heartRate" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11" placeholder="72" value={formData.heartRate} onChange={handleChange} />
-                                                <Heart className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
-                                            </div>
-                                        </div>
-                                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">SBP (mmHg)</label>
-                                                <input type="number" name="sbp" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="120" value={formData.sbp} onChange={handleChange} />
-                                                <p className="text-xs text-slate-500">Systolic Blood Pressure</p>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">DBP (mmHg)</label>
-                                                <input type="number" name="dbp" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="80" value={formData.dbp} onChange={handleChange} />
-                                                <p className="text-xs text-slate-500">Diastolic Blood Pressure</p>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-
-                                {!isFamilyView && (
+                                {!isFamilyView && !hasSavedProfile && (
                                     <>
                                         <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
                                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                                                 <Thermometer className="w-5 h-5 text-emerald-500" />
                                                 Clinical Measurements
                                             </h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Blood Pressure</label>
+                                            <select name="hasBp" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasBp} onChange={handleChange}>
+                                                <option value="">Select answer</option>
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diabetes</label>
+                                            <select name="hasDiabetes" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasDiabetes} onChange={handleChange}>
+                                                <option value="">Select answer</option>
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No</option>
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fasting Blood Sugar</label>
@@ -535,14 +686,17 @@ function MedicalDetails() {
                                         </div>
                                     </>
                                 )}
+
                             </div>
                         )}
 
                         <div className="mt-12 flex items-center justify-end gap-4">
-                            <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
-                                {isFamilyView ? 'Back to Dashboard' : 'Skip for now'}
-                            </button>
-                            {!isFamilyView && (
+                            {!isFamilyView && !hasSavedProfile && (
+                                <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
+                                    Skip for now
+                                </button>
+                            )}
+                            {!isFamilyView && !hasSavedProfile && (
                                 <button type="submit" disabled={loading} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed">
                                     {loading ? (
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

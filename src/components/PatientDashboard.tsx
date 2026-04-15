@@ -39,6 +39,11 @@ type DailyHealthLog = {
   updated_at?: string;
 };
 
+type MedicalDocument = {
+  id?: string;
+  uploaded_at?: string;
+};
+
 type MedicationDose = {
   medicine_name: string;
   scheduled_label: string;
@@ -183,6 +188,7 @@ function PatientDashboard({ userName }: Props) {
   const [appointmentError, setAppointmentError] = useState('');
   const [doctorCount, setDoctorCount] = useState<number | null>(null);
   const [lastHealthEntry, setLastHealthEntry] = useState('No entries yet');
+  const [lastDocumentEntry, setLastDocumentEntry] = useState('No documents yet');
   const [medicationSummary, setMedicationSummary] = useState<MedicationSummary | null>(null);
   const [medicationError, setMedicationError] = useState('');
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -283,6 +289,38 @@ function PatientDashboard({ userName }: Props) {
     };
 
     loadDoctors();
+  }, []);
+
+  useEffect(() => {
+    const loadLatestDocumentEntry = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLastDocumentEntry('Unavailable');
+        return;
+      }
+
+      try {
+        const data = await requestJson(`${API_BASE_URL}/medical-documents`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const documents = Array.isArray(data) ? (data as MedicalDocument[]) : [];
+        const latestTimestamp = documents
+          .map((document) => parseServerTimestamp(document.uploaded_at))
+          .filter((value): value is Date => value instanceof Date)
+          .sort((first, second) => second.getTime() - first.getTime())[0];
+
+        setLastDocumentEntry(latestTimestamp ? formatRelativeTime(latestTimestamp) : 'No documents yet');
+      } catch (error) {
+        console.error('Failed to load latest document entry:', error);
+        setLastDocumentEntry('Unavailable');
+      }
+    };
+
+    loadLatestDocumentEntry();
   }, []);
 
   useEffect(() => {
@@ -392,7 +430,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Conditions, allergies, and past records',
       icon: FileText,
       color: 'bg-pink-500',
-      stats: 'Last updated: 1 week ago',
+      stats: `Last updated: ${lastDocumentEntry}`,
       path: '/medical-history'
     },
   ];

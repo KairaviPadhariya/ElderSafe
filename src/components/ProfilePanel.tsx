@@ -23,7 +23,6 @@ type ProfileData = {
   address: string;
   details: Record<string, string>;
   emergencyContact: {
-    name: string;
     phone: string;
   } | null;
 };
@@ -40,11 +39,14 @@ type PatientRecord = {
   heart_rate?: number;
   sbp?: number;
   dbp?: number;
+  has_bp?: boolean | null;
+  has_diabetes?: boolean | null;
   fbs?: number | null;
   ppbs?: number | null;
   cholesterol?: number | null;
   phone?: string | null;
   address?: string | null;
+  emergency_contact_phone?: string | null;
 };
 
 type FamilyRecord = {
@@ -106,7 +108,6 @@ function createFallbackProfile(
           'Age': 'Not provided',
         },
         emergencyContact: {
-          name: 'Not provided',
           phone: 'Not provided',
         }
       };
@@ -148,6 +149,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     email: '',
     phone: '',
     address: '',
+    emergencyContactPhone: '',
     specialization: '',
     licenseNo: '',
     experienceYears: '',
@@ -308,8 +310,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
             'Age': patientData.age ? String(patientData.age) : 'Not provided',
           },
           emergencyContact: {
-            name: 'Not provided',
-            phone: 'Not provided',
+            phone: patientData.emergency_contact_phone || 'Not provided',
           }
         });
       } catch (error) {
@@ -326,6 +327,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
       email: displayProfile.email,
       phone: displayProfile.phone,
       address: displayProfile.address,
+      emergencyContactPhone: displayProfile.emergencyContact?.phone !== 'Not provided' ? displayProfile.emergencyContact?.phone || '' : '',
       specialization: role === 'doctor' ? displayProfile.role : '',
       licenseNo: role === 'doctor' && displayProfile.details['License No'] !== 'Not provided'
         ? displayProfile.details['License No']
@@ -417,11 +419,14 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
             heart_rate: patientRecord.heart_rate,
             sbp: patientRecord.sbp,
             dbp: patientRecord.dbp,
+            has_bp: patientRecord.has_bp ?? null,
+            has_diabetes: patientRecord.has_diabetes ?? null,
             fbs: patientRecord.fbs ?? null,
             ppbs: patientRecord.ppbs ?? null,
             cholesterol: patientRecord.cholesterol ?? null,
             phone: editFormData.phone === 'Not provided' ? null : editFormData.phone,
             address: editFormData.address === 'Not provided' ? null : editFormData.address,
+            emergency_contact_phone: editFormData.emergencyContactPhone || null,
           })
         });
 
@@ -437,6 +442,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           name: editFormData.name,
           phone: editFormData.phone,
           address: editFormData.address,
+          emergency_contact_phone: editFormData.emergencyContactPhone,
         }));
       } catch (error) {
         console.error('Failed to save patient profile:', error);
@@ -520,6 +526,13 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
                 : 'Not provided',
               'Hospital': editFormData.address || 'Not provided',
               'Bio': editFormData.bio || 'Not provided',
+            }
+          }
+        : {}),
+      ...(role === 'patient'
+        ? {
+            emergencyContact: {
+              phone: editFormData.emergencyContactPhone || 'Not provided',
             }
           }
         : {})
@@ -607,9 +620,6 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
                         Emergency Contact
                       </h4>
                       <div className="space-y-2">
-                        <p className="text-gray-700 dark:text-slate-300 font-medium">
-                          {displayProfile.emergencyContact.name}
-                        </p>
                         <div className="flex items-center gap-3">
                           <Phone className="w-5 h-5 text-gray-500 dark:text-slate-400" />
                           <span className="text-gray-700 dark:text-slate-300">
@@ -674,6 +684,22 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
                           rows={3}
                         />
                       </div>
+                      {role === 'patient' && (
+                        <div className="border-t border-gray-200 pt-3 dark:border-slate-600">
+                          <h5 className="mb-3 font-medium text-gray-900 dark:text-white">Emergency Contact</h5>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700 dark:text-slate-300 block mb-1">Contact Phone</label>
+                              <input
+                                type="tel"
+                                value={editFormData.emergencyContactPhone}
+                                onChange={(e) => setEditFormData({ ...editFormData, emergencyContactPhone: e.target.value })}
+                                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {role === 'doctor' && (
                         <>
                           <div>

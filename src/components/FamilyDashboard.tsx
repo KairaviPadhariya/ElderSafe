@@ -36,6 +36,7 @@ type FamilyRecord = {
 
 type PatientRecord = {
     _id: string;
+    user_id?: string;
     name?: string;
     age?: number;
     gender?: string;
@@ -93,6 +94,52 @@ function formatGender(gender?: string) {
     return gender.charAt(0).toUpperCase() + gender.slice(1);
 }
 
+function normalizeName(value?: string | null) {
+    return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function parseServerTimestamp(value?: string) {
+    if (!value) {
+        return null;
+    }
+
+    const normalizedValue = /z$/i.test(value) ? value : `${value}Z`;
+    const timestamp = new Date(normalizedValue);
+
+    return Number.isNaN(timestamp.getTime()) ? null : timestamp;
+}
+
+function resolveLinkedPatient(patients: PatientRecord[], familyRecord: FamilyRecord | null) {
+    if (!familyRecord) {
+        return null;
+    }
+
+    const directMatch =
+        patients.find((patient) => patient._id === familyRecord.patient_id) ||
+        patients.find((patient) => patient.user_id === familyRecord.patient_id);
+
+    if (directMatch) {
+        return directMatch;
+    }
+
+    const familyPatientName = normalizeName(familyRecord.patient_name);
+    if (!familyPatientName) {
+        return null;
+    }
+
+    const exactNameMatch = patients.find((patient) => normalizeName(patient.name) === familyPatientName);
+    if (exactNameMatch) {
+        return exactNameMatch;
+    }
+
+    const prefixMatches = patients.filter((patient) => normalizeName(patient.name).startsWith(`${familyPatientName} `));
+    if (prefixMatches.length === 1) {
+        return prefixMatches[0];
+    }
+
+    return null;
+}
+
 function getVitalsStatus(patient: PatientRecord | null) {
     if (!patient) {
         return {
@@ -127,8 +174,8 @@ function formatSosTime(timestamp?: string) {
         return 'just now';
     }
 
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) {
+    const date = parseServerTimestamp(timestamp);
+    if (!date) {
         return 'recently';
     }
 
@@ -161,13 +208,21 @@ function FamilyDashboard({ userName }: Props) {
     }, [userName]);
 
     useEffect(() => {
-        const loadDashboardData = async () => {
+        let isMounted = true;
+
+        const loadDashboardData = async (showLoader = false) => {
             const token = localStorage.getItem('token');
 
             if (!token) {
-                setError('Please log in again to view the linked patient dashboard.');
-                setLoading(false);
+                if (isMounted) {
+                    setError('Please log in again to view the linked patient dashboard.');
+                    setLoading(false);
+                }
                 return;
+            }
+
+            if (showLoader && isMounted) {
+                setLoading(true);
             }
 
             try {
@@ -193,6 +248,10 @@ function FamilyDashboard({ userName }: Props) {
                 const patients = Array.isArray(patientsData) ? (patientsData as PatientRecord[]) : [];
                 const sosAlerts = Array.isArray(sosData) ? (sosData as SOSAlert[]) : [];
 
+                if (!isMounted) {
+                    return;
+                }
+
                 setFamilyRecord(resolvedFamilyRecord);
 
                 if (!resolvedFamilyRecord) {
@@ -201,10 +260,7 @@ function FamilyDashboard({ userName }: Props) {
                     return;
                 }
 
-                const matchedPatient =
-                    patients.find((patient) => patient._id === resolvedFamilyRecord.patient_id) ||
-                    patients.find((patient) => patient.name === resolvedFamilyRecord.patient_name) ||
-                    null;
+                const matchedPatient = resolveLinkedPatient(patients, resolvedFamilyRecord);
 
                 const unresolvedAlerts = sosAlerts.filter((alert) => alert.status !== 'resolved');
 
@@ -213,13 +269,41 @@ function FamilyDashboard({ userName }: Props) {
                 setError(matchedPatient ? '' : 'The linked patient record could not be found in the database.');
             } catch (loadError) {
                 console.error('Failed to load family dashboard:', loadError);
-                setError(loadError instanceof Error ? loadError.message : 'Unable to load linked patient details.');
+                if (isMounted) {
+                    setError(loadError instanceof Error ? loadError.message : 'Unable to load linked patient details.');
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
-        loadDashboardData();
+        loadDashboardData(true);
+
+        const refreshDashboard = () => {
+            void loadDashboardData(false);
+        };
+
+        const intervalId = window.setInterval(refreshDashboard, 15000);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshDashboard();
+            }
+        };
+
+        window.addEventListener('focus', refreshDashboard);
+        window.addEventListener('notifications-updated', refreshDashboard as EventListener);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', refreshDashboard);
+            window.removeEventListener('notifications-updated', refreshDashboard as EventListener);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     const patientName = linkedPatient?.name || familyRecord?.patient_name || 'No patient linked';

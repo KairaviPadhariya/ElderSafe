@@ -9,10 +9,26 @@ from app.utils.auth import verify_token
 
 router = APIRouter()
 SOS_ACTIVE_WINDOW = timedelta(hours=24)
+NOTIFICATION_RETENTION_WINDOW = timedelta(hours=24)
+
+
+def normalize_name(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+async def user_exists(user_id: str | None) -> bool:
+    if not user_id or not ObjectId.is_valid(user_id):
+        return False
+
+    return await database.users.count_documents({"_id": ObjectId(user_id)}, limit=1) > 0
 
 
 def get_sos_active_cutoff() -> datetime:
     return datetime.utcnow() - SOS_ACTIVE_WINDOW
+
+
+def get_notification_retention_cutoff() -> datetime:
+    return datetime.utcnow() - NOTIFICATION_RETENTION_WINDOW
 
 
 def build_notification(notification_id: str, title: str, message: str, created_at, type_: str, priority: str):
@@ -108,7 +124,29 @@ async def find_patient_profile_by_name(patient_name: str | None):
     if not patient_name:
         return None
 
-    return await database.patients.find_one({"name": patient_name})
+    normalized_query = normalize_name(patient_name)
+    exact_matches: list[dict] = []
+    prefix_matches: list[dict] = []
+
+    async for patient in database.patients.find({}):
+        candidate_name = normalize_name(patient.get("name"))
+        if not candidate_name:
+            continue
+
+        if candidate_name == normalized_query:
+            exact_matches.append(patient)
+        elif normalized_query and candidate_name.startswith(f"{normalized_query} "):
+            prefix_matches.append(patient)
+
+    for patient in exact_matches:
+        if await user_exists(patient.get("user_id")):
+            return patient
+
+    active_prefix_matches = [patient for patient in prefix_matches if await user_exists(patient.get("user_id"))]
+    if len(active_prefix_matches) == 1:
+        return active_prefix_matches[0]
+
+    return exact_matches[0] if exact_matches else None
 
 
 async def resolve_linked_patient_user_id(patient_reference: str | None) -> str | None:
@@ -125,6 +163,31 @@ async def resolve_linked_patient_user_id(patient_reference: str | None) -> str |
     return patient_reference
 
 
+async def build_patient_aliases(patient_reference: str | None) -> list[str]:
+    if not patient_reference:
+        return []
+
+    aliases = [str(patient_reference)]
+    patient_profile = None
+
+    if ObjectId.is_valid(str(patient_reference)):
+        patient_profile = await database.patients.find_one({"_id": ObjectId(str(patient_reference))})
+    else:
+        patient_profile = await database.patients.find_one({"user_id": str(patient_reference)})
+
+    if patient_profile:
+        aliases.append(str(patient_profile["_id"]))
+        if patient_profile.get("user_id"):
+            aliases.append(str(patient_profile["user_id"]))
+
+    deduped_aliases: list[str] = []
+    for alias in aliases:
+        if alias not in deduped_aliases:
+            deduped_aliases.append(alias)
+
+    return deduped_aliases
+
+
 async def get_latest_health_log(patient_id: str):
     return await database.daily_health_logs.find_one(
         {"patient_id": patient_id},
@@ -136,11 +199,16 @@ async def get_patient_profile_by_user_id(user_id: str):
     return await database.patients.find_one({"user_id": user_id})
 
 
-async def get_active_sos_notifications(patient_id: str, label: str):
+async def get_active_sos_notifications(patient_ids: list[str], label: str):
     notifications = []
+    if not patient_ids:
+        return notifications
 
     async for alert in database.sos.find({
-        "patient_id": patient_id,
+        "$or": [
+            {"patient_id": {"$in": patient_ids}},
+            {"created_by": {"$in": patient_ids}}
+        ],
         "status": {"$ne": "resolved"},
         "created_at": {"$gte": get_sos_active_cutoff()}
     }).sort("created_at", -1):
@@ -241,9 +309,10 @@ async def build_patient_notifications(current_user: dict):
     patient_id = current_user["sub"]
     patient_profile = await get_patient_profile_by_user_id(patient_id)
     medication_patient_id = str(patient_profile["_id"]) if patient_profile else patient_id
+    patient_aliases = await build_patient_aliases(patient_id)
     notifications = []
 
-    notifications.extend(await get_active_sos_notifications(patient_id, "you"))
+    notifications.extend(await get_active_sos_notifications(patient_aliases or [patient_id], "you"))
     notifications.extend(await get_upcoming_appointment_notifications(
         {"patient_id": patient_id},
         lambda appointment: (
@@ -321,6 +390,9 @@ async def build_family_notifications(current_user: dict):
         ]
 
     sos_patient_id = await resolve_linked_patient_user_id(patient_reference) or patient_reference
+    sos_patient_aliases = await build_patient_aliases(sos_patient_id)
+    if patient_reference not in sos_patient_aliases:
+        sos_patient_aliases.append(patient_reference)
     patient_name = (
         family_record.get("patient_name")
         or (matched_patient_profile or {}).get("name")
@@ -328,7 +400,7 @@ async def build_family_notifications(current_user: dict):
     )
     notifications = []
 
-    notifications.extend(await get_active_sos_notifications(sos_patient_id, patient_name))
+    notifications.extend(await get_active_sos_notifications(sos_patient_aliases, patient_name))
     notifications.extend(await get_upcoming_appointment_notifications(
         {"patient_id": patient_reference},
         lambda appointment: (
@@ -469,9 +541,13 @@ async def get_notifications(current_user: dict = Depends(verify_token)):
     role = current_user.get("role")
     notifications = []
     sos_cutoff = get_sos_active_cutoff()
+    retention_cutoff = get_notification_retention_cutoff()
 
     stored_notifications = []
-    async for record in database.notifications.find({"user_id": current_user["sub"]}).sort("created_at", -1):
+    async for record in database.notifications.find({
+        "user_id": current_user["sub"],
+        "created_at": {"$gte": retention_cutoff}
+    }).sort("created_at", -1):
         created_at = record.get("created_at") or datetime.utcnow()
         if record.get("source") == "sos" and created_at < sos_cutoff:
             continue
@@ -496,6 +572,11 @@ async def get_notifications(current_user: dict = Depends(verify_token)):
     else:
         notifications.extend(await build_patient_notifications(current_user))
 
+    notifications = [
+        notification
+        for notification in notifications
+        if datetime.fromisoformat(notification["created_at"]) >= retention_cutoff
+    ]
     notifications.sort(key=lambda item: item["created_at"], reverse=True)
     return notifications[:12]
 
