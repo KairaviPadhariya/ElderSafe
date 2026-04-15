@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Clipboard, Heart, Lock, Save, Scale, Thermometer, User } from 'lucide-react';
+import { Activity, Clipboard, FileText, Heart, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
@@ -129,6 +129,39 @@ function ReadOnlyTableSection({
                     </div>
                 ))}
             </div>
+        </div>
+    );
+}
+
+function FamilyQuickCard({
+    title,
+    description,
+    buttonLabel,
+    accentClass,
+    icon,
+    onClick
+}: {
+    title: string;
+    description: string;
+    buttonLabel: string;
+    accentClass: string;
+    icon: JSX.Element;
+    onClick: () => void;
+}) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-transform hover:-translate-y-1 dark:border-slate-700 dark:bg-slate-900/40">
+            <div className={`mb-4 inline-flex rounded-2xl p-3 ${accentClass}`}>
+                {icon}
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+            <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+            <button
+                type="button"
+                onClick={onClick}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+            >
+                {buttonLabel}
+            </button>
         </div>
     );
 }
@@ -334,6 +367,35 @@ function MedicalDetails() {
                             <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                                 <Lock className="w-4 h-4" />
                                 Family members can review the linked patient's information here, but cannot edit it.
+                            </div>
+                        )}
+
+                        {isFamilyView && !familyLoading && (
+                            <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <FamilyQuickCard
+                                    title="Patient Info"
+                                    description={`Review ${linkedPatientName || 'the linked patient'}'s medical profile and current health information on this page.`}
+                                    buttonLabel="View Patient Info"
+                                    accentClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                    icon={<User className="h-6 w-6" />}
+                                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                                />
+                                <FamilyQuickCard
+                                    title="Medical Documents"
+                                    description="View uploaded prescriptions and reports for the linked patient, or upload a new file for record keeping."
+                                    buttonLabel="Open Documents"
+                                    accentClass="bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400"
+                                    icon={<FileText className="h-6 w-6" />}
+                                    onClick={() => navigate('/medical-history')}
+                                />
+                                <FamilyQuickCard
+                                    title="Health Trends"
+                                    description="See the linked patient's saved health logs and review trends across blood pressure, glucose, oxygen, and temperature."
+                                    buttonLabel="View Health Trends"
+                                    accentClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                    icon={<TrendingUp className="h-6 w-6" />}
+                                    onClick={() => navigate('/health-trends')}
+                                />
                             </div>
                         )}
 
