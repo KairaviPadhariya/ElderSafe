@@ -76,3 +76,23 @@ export const uploadDocument = async (file: File) => {
 
   return response.json();
 };
+
+export const api = {
+  register: registerUser,
+  login: async ({ email, password }: { email: string; password: string }) => {
+    return loginUser(email, password);
+  },
+  getNotifications,
+  uploadDocument
+};
+
+export const decodeJWT = (token: string) => {
+  try {
+    const payload = token.split(".")[1];
+    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.error("Failed to decode JWT:", error);
+    return null;
+  }
+};
