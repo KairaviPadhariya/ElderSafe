@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from app.database import database
+from app.schemas.password_reset import PasswordResetCheck, PasswordResetConfirm
 from app.schemas.user import UserCreate
 from datetime import datetime
 from passlib.context import CryptContext
@@ -16,6 +17,34 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # -------- PASSWORD HASH --------
 def hash_password(password: str):
     return pwd_context.hash(password)
+
+
+@router.post("/forgot-password/check-email")
+async def check_reset_email(payload: PasswordResetCheck):
+    db_user = await database.users.find_one({"email": payload.email})
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Email not found in our records")
+
+    return {"exists": True}
+
+
+@router.post("/forgot-password/reset")
+async def reset_password(payload: PasswordResetConfirm):
+    db_user = await database.users.find_one({"email": payload.email})
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Email not found in our records")
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    await database.users.update_one(
+        {"_id": db_user["_id"]},
+        {"$set": {"password": hash_password(payload.new_password)}}
+    )
+
+    return {"message": "Password reset successful"}
 
 # ---------------- CREATE USER ----------------
 @router.post("/users")

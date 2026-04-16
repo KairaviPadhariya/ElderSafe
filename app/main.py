@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, client
+from app.ml_safety.router import router as ml_safety_router
 from app.routes import (
     users,
     patients,
@@ -24,7 +25,12 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Allow specific origins for development
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "http://34.233.187.127",
+        "http://34.233.187.127:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +51,7 @@ app.include_router(notifications.router)
 app.include_router(prescriptions.router)
 app.include_router(sos.router)
 app.include_router(medical_documents.router)
+app.include_router(ml_safety_router)
 
 
 @app.get("/health")

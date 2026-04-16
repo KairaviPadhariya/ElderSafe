@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Heart, Activity, Droplet, Stethoscope } from 'lucide-react';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+import { predictSafetyStatus } from '../services/seniorSafetyApi';
+import { getWeeklyAverageVitals, roundAverage } from '../utils/patientData';
+
+const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
-const WEEK_IN_DAYS = 7;
 
 type DailyHealthLog = {
   _id?: string;
@@ -15,6 +17,44 @@ type DailyHealthLog = {
   post_prandial_glucose?: number;
   o2_saturation?: number;
 };
+
+type PatientProfile = {
+  _id?: string;
+  user_id?: string;
+  age?: number | null;
+  gender?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  bmi?: number | null;
+  cholesterol?: number | null;
+  has_bp?: boolean | null;
+  has_diabetes?: boolean | null;
+  has_cardiac_history?: boolean | null;
+};
+
+type MlPredictionResponse = {
+  prediction: 'normal' | 'warning' | 'emergency';
+  personalized_baseline: {
+    sbp: number;
+    dbp: number;
+    hr: number;
+    o2_saturation: number;
+    fbs: number;
+    ppbs: number;
+    cholesterol: number;
+  };
+};
+
+type MetricStatusMap = {
+  heartRate: string;
+  bloodPressure: string;
+  bloodGlucose: string;
+  oxygenLevel: string;
+};
+
+interface QuickStatsProps {
+  patientId?: string | null;
+}
 
 async function requestJson(url: string, options: RequestInit = {}) {
   const controller = new AbortController();
@@ -45,159 +85,335 @@ async function requestJson(url: string, options: RequestInit = {}) {
   }
 }
 
-function getWeekStartDate() {
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(now.getDate() - (WEEK_IN_DAYS - 1));
-  return start;
-}
-
-function getLogDate(logDate?: string) {
-  if (!logDate) {
+function calculateBmi(weight?: number | null, height?: number | null) {
+  if (!weight || !height || height <= 0) {
     return null;
   }
 
-  const parsed = new Date(`${logDate}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const heightInMeters = height / 100;
+  return Number((weight / (heightInMeters * heightInMeters)).toFixed(1));
 }
 
-function roundAverage(values: number[]) {
-  if (values.length === 0) {
-    return null;
-  }
-
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return Math.round(total / values.length);
-}
-
-function getMetricStatus(value: number | null, min: number, max: number) {
-  if (value === null) {
+function formatMlStatus(status?: string) {
+  if (!status) {
     return 'No data';
   }
 
-  return value >= min && value <= max ? 'Normal' : 'Review';
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function QuickStats() {
+function QuickStats({ patientId }: QuickStatsProps) {
   const [logs, setLogs] = useState<DailyHealthLog[]>([]);
+  const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [metricStatuses, setMetricStatuses] = useState<MetricStatusMap>({
+    heartRate: 'No data',
+    bloodPressure: 'No data',
+    bloodGlucose: 'No data',
+    oxygenLevel: 'No data'
+  });
 
   useEffect(() => {
-    const loadWeeklyLogs = async () => {
+    const loadQuickStatsData = async () => {
       const token = localStorage.getItem('token');
 
       if (!token) {
         setLogs([]);
+        setProfile(null);
         setLoading(false);
         return;
       }
 
       try {
-        const data = await requestJson(`${API_BASE_URL}/daily_health_logs`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        const logsUrl = patientId
+          ? `${API_BASE_URL}/daily_health_logs?patient_id=${encodeURIComponent(patientId)}`
+          : `${API_BASE_URL}/daily_health_logs`;
 
-        setLogs(Array.isArray(data) ? (data as DailyHealthLog[]) : []);
+        const [logsData, profileData] = await Promise.all([
+          requestJson(logsUrl, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }),
+          requestJson(patientId ? `${API_BASE_URL}/patients` : `${API_BASE_URL}/patients/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          })
+        ]);
+
+        setLogs(Array.isArray(logsData) ? (logsData as DailyHealthLog[]) : []);
+        if (patientId && Array.isArray(profileData)) {
+          const matchedProfile =
+            (profileData as PatientProfile[]).find((entry) => entry._id === patientId)
+            || (profileData as Array<PatientProfile & { user_id?: string }>).find((entry) => entry.user_id === patientId)
+            || null;
+          setProfile(matchedProfile);
+        } else {
+          setProfile((profileData as PatientProfile | null) ?? null);
+        }
       } catch (error) {
         console.error('Failed to load weekly quick stats:', error);
         setLogs([]);
+        setProfile(null);
       } finally {
         setLoading(false);
       }
     };
 
-    loadWeeklyLogs();
-  }, []);
+    loadQuickStatsData();
+  }, [patientId]);
 
-  const stats = useMemo(() => {
-    const weekStart = getWeekStartDate();
-    const weeklyLogs = logs.filter((log) => {
-      const logDate = getLogDate(log.log_date);
-      return logDate ? logDate >= weekStart : false;
-    });
+  const weeklyMetrics = useMemo(() => {
+    const {
+      weeklyLogs,
+      averageHeartRate,
+      averageSystolic,
+      averageDiastolic,
+      averageGlucose,
+      averageOxygen,
+    } = getWeeklyAverageVitals(logs);
 
-    const heartRates = weeklyLogs
-      .map((log) => log.heart_rate)
-      .filter((value): value is number => typeof value === 'number');
-    const systolicValues = weeklyLogs
-      .map((log) => log.systolic_bp)
-      .filter((value): value is number => typeof value === 'number');
-    const diastolicValues = weeklyLogs
-      .map((log) => log.diastolic_bp)
-      .filter((value): value is number => typeof value === 'number');
-    const glucoseValues = weeklyLogs
-      .flatMap((log) => [log.fasting_blood_glucose, log.post_prandial_glucose])
-      .filter((value): value is number => typeof value === 'number');
-    const oxygenValues = weeklyLogs
-      .map((log) => log.o2_saturation)
-      .filter((value): value is number => typeof value === 'number');
-
-    const averageHeartRate = roundAverage(heartRates);
-    const averageSystolic = roundAverage(systolicValues);
-    const averageDiastolic = roundAverage(diastolicValues);
-    const averageGlucose = roundAverage(glucoseValues);
-    const averageOxygen = roundAverage(oxygenValues);
+    const averageFbs = roundAverage(
+      weeklyLogs
+        .map((log) => log.fasting_blood_glucose)
+        .filter((value): value is number => typeof value === 'number')
+    );
+    const averagePpbs = roundAverage(
+      weeklyLogs
+        .map((log) => log.post_prandial_glucose)
+        .filter((value): value is number => typeof value === 'number')
+    );
     const weeklySummary = weeklyLogs.length === 1 ? '1 entry this week' : `${weeklyLogs.length} entries this week`;
 
+    return {
+      weeklyLogs,
+      averageHeartRate,
+      averageSystolic,
+      averageDiastolic,
+      averageGlucose,
+      averageOxygen,
+      averageFbs,
+      averagePpbs,
+      weeklySummary
+    };
+  }, [logs]);
+
+  useEffect(() => {
+    const runMetricPredictions = async () => {
+      if (loading) {
+        return;
+      }
+
+      const age = profile?.age ?? null;
+      const gender = profile?.gender ?? null;
+      const weight = profile?.weight ?? null;
+      const bmi = profile?.bmi ?? calculateBmi(weight, profile?.height);
+      const cholesterol = profile?.cholesterol ?? null;
+
+      const requiredValues = [
+        age,
+        gender,
+        weight,
+        bmi,
+        cholesterol,
+        weeklyMetrics.averageHeartRate,
+        weeklyMetrics.averageSystolic,
+        weeklyMetrics.averageDiastolic,
+        weeklyMetrics.averageOxygen,
+        weeklyMetrics.averageFbs,
+        weeklyMetrics.averagePpbs
+      ];
+
+      if (requiredValues.some((value) => value === null || value === undefined || value === '')) {
+        setMetricStatuses({
+          heartRate: 'No data',
+          bloodPressure: 'No data',
+          bloodGlucose: 'No data',
+          oxygenLevel: 'No data'
+        });
+        return;
+      }
+
+      try {
+        const basePayload = {
+          patient_id: profile?._id,
+          age: Number(age),
+          gender: String(gender),
+          weight: Number(weight),
+          bmi: Number(bmi),
+          cholesterol: Number(cholesterol),
+          has_hypertension: Boolean(profile?.has_bp),
+          has_diabetes: Boolean(profile?.has_diabetes),
+          has_cardiac_history: Boolean(profile?.has_cardiac_history)
+        };
+
+        const overallPrediction = await predictSafetyStatus({
+          patient_id: basePayload.patient_id ?? undefined,
+          age: basePayload.age,
+          gender: basePayload.gender,
+          weight: basePayload.weight,
+          bmi: basePayload.bmi,
+          o2_saturation: Number(weeklyMetrics.averageOxygen),
+          hr: Number(weeklyMetrics.averageHeartRate),
+          sbp: Number(weeklyMetrics.averageSystolic),
+          dbp: Number(weeklyMetrics.averageDiastolic),
+          fbs: Number(weeklyMetrics.averageFbs),
+          ppbs: Number(weeklyMetrics.averagePpbs),
+          cholesterol: basePayload.cholesterol,
+          has_hypertension: basePayload.has_hypertension,
+          has_diabetes: basePayload.has_diabetes,
+          has_cardiac_history: basePayload.has_cardiac_history
+        }) as MlPredictionResponse;
+
+        const baseline = overallPrediction.personalized_baseline;
+
+        const [heartRateResult, bloodPressureResult, bloodGlucoseResult, oxygenResult] = await Promise.all([
+          predictSafetyStatus({
+            patient_id: basePayload.patient_id ?? undefined,
+            age: basePayload.age,
+            gender: basePayload.gender,
+            weight: basePayload.weight,
+            bmi: basePayload.bmi,
+            o2_saturation: baseline.o2_saturation,
+            hr: Number(weeklyMetrics.averageHeartRate),
+            sbp: baseline.sbp,
+            dbp: baseline.dbp,
+            fbs: baseline.fbs,
+            ppbs: baseline.ppbs,
+            cholesterol: baseline.cholesterol,
+            has_hypertension: basePayload.has_hypertension,
+            has_diabetes: basePayload.has_diabetes,
+            has_cardiac_history: basePayload.has_cardiac_history
+          }),
+          predictSafetyStatus({
+            patient_id: basePayload.patient_id ?? undefined,
+            age: basePayload.age,
+            gender: basePayload.gender,
+            weight: basePayload.weight,
+            bmi: basePayload.bmi,
+            o2_saturation: baseline.o2_saturation,
+            hr: baseline.hr,
+            sbp: Number(weeklyMetrics.averageSystolic),
+            dbp: Number(weeklyMetrics.averageDiastolic),
+            fbs: baseline.fbs,
+            ppbs: baseline.ppbs,
+            cholesterol: baseline.cholesterol,
+            has_hypertension: basePayload.has_hypertension,
+            has_diabetes: basePayload.has_diabetes,
+            has_cardiac_history: basePayload.has_cardiac_history
+          }),
+          predictSafetyStatus({
+            patient_id: basePayload.patient_id ?? undefined,
+            age: basePayload.age,
+            gender: basePayload.gender,
+            weight: basePayload.weight,
+            bmi: basePayload.bmi,
+            o2_saturation: baseline.o2_saturation,
+            hr: baseline.hr,
+            sbp: baseline.sbp,
+            dbp: baseline.dbp,
+            fbs: Number(weeklyMetrics.averageFbs),
+            ppbs: Number(weeklyMetrics.averagePpbs),
+            cholesterol: baseline.cholesterol,
+            has_hypertension: basePayload.has_hypertension,
+            has_diabetes: basePayload.has_diabetes,
+            has_cardiac_history: basePayload.has_cardiac_history
+          }),
+          predictSafetyStatus({
+            patient_id: basePayload.patient_id ?? undefined,
+            age: basePayload.age,
+            gender: basePayload.gender,
+            weight: basePayload.weight,
+            bmi: basePayload.bmi,
+            o2_saturation: Number(weeklyMetrics.averageOxygen),
+            hr: baseline.hr,
+            sbp: baseline.sbp,
+            dbp: baseline.dbp,
+            fbs: baseline.fbs,
+            ppbs: baseline.ppbs,
+            cholesterol: baseline.cholesterol,
+            has_hypertension: basePayload.has_hypertension,
+            has_diabetes: basePayload.has_diabetes,
+            has_cardiac_history: basePayload.has_cardiac_history
+          })
+        ]);
+
+        setMetricStatuses({
+          heartRate: formatMlStatus((heartRateResult as MlPredictionResponse).prediction),
+          bloodPressure: formatMlStatus((bloodPressureResult as MlPredictionResponse).prediction),
+          bloodGlucose: formatMlStatus((bloodGlucoseResult as MlPredictionResponse).prediction),
+          oxygenLevel: formatMlStatus((oxygenResult as MlPredictionResponse).prediction)
+        });
+      } catch (error) {
+        console.error('Failed to load ML card statuses:', error);
+        setMetricStatuses({
+          heartRate: 'No data',
+          bloodPressure: 'No data',
+          bloodGlucose: 'No data',
+          oxygenLevel: 'No data'
+        });
+      }
+    };
+
+    runMetricPredictions();
+  }, [loading, profile, weeklyMetrics]);
+
+  const stats = useMemo(() => {
     return [
       {
         label: 'Heart Rate',
-        value: averageHeartRate?.toString() || '--',
+        value: weeklyMetrics.averageHeartRate?.toString() || '--',
         unit: 'bpm',
         icon: Heart,
-        status: getMetricStatus(averageHeartRate, 60, 100),
-        trend: loading ? 'Loading weekly average...' : weeklySummary,
+        status: metricStatuses.heartRate,
+        trend: '',
         gradient: 'from-emerald-400 to-emerald-600'
       },
       {
         label: 'Blood Pressure',
-        value: averageSystolic !== null && averageDiastolic !== null ? `${averageSystolic}/${averageDiastolic}` : '--/--',
+        value: weeklyMetrics.averageSystolic !== null && weeklyMetrics.averageDiastolic !== null ? `${weeklyMetrics.averageSystolic}/${weeklyMetrics.averageDiastolic}` : '--/--',
         unit: 'mmHg',
         icon: Stethoscope,
-        status:
-          averageSystolic !== null && averageDiastolic !== null && averageSystolic < 140 && averageDiastolic < 90
-            ? 'Normal'
-            : averageSystolic === null || averageDiastolic === null
-              ? 'No data'
-              : 'Review',
-        trend: loading ? 'Loading weekly average...' : 'Average of this week',
+        status: metricStatuses.bloodPressure,
+        trend: '',
         gradient: 'from-blue-400 to-blue-600'
       },
       {
         label: 'Blood Glucose',
-        value: averageGlucose?.toString() || '--',
+        value: weeklyMetrics.averageGlucose?.toString() || '--',
         unit: 'mg/dL',
         icon: Droplet,
-        status: getMetricStatus(averageGlucose, 70, 140),
-        trend: loading ? 'Loading weekly average...' : 'Average of this week',
+        status: metricStatuses.bloodGlucose,
+        trend: '',
         gradient: 'from-cyan-400 to-cyan-600'
       },
       {
         label: 'Oxygen Level',
-        value: averageOxygen?.toString() || '--',
+        value: weeklyMetrics.averageOxygen?.toString() || '--',
         unit: '%',
         icon: Activity,
-        status: averageOxygen === null ? 'No data' : averageOxygen >= 95 ? 'Normal' : 'Review',
-        trend: loading ? 'Loading weekly average...' : averageOxygen === null ? 'No oxygen logs this week' : 'Average of this week',
+        status: metricStatuses.oxygenLevel,
+        trend: '',
         gradient: 'from-violet-400 to-violet-600'
       },
     ];
-  }, [loading, logs]);
+  }, [loading, metricStatuses, weeklyMetrics]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat) => {
         const Icon = stat.icon;
         const isNormal = stat.status === 'Normal';
-        const isReview = stat.status === 'Review';
+        const isWarning = stat.status === 'Warning';
+        const isEmergency = stat.status === 'Emergency';
         const statusClasses = isNormal
           ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-100 dark:border-emerald-800'
-          : isReview
+          : isWarning
             ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800'
-            : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600';
+            : isEmergency
+              ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/30 border-rose-100 dark:border-rose-800'
+              : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600';
 
         return (
           <div
@@ -223,7 +439,9 @@ function QuickStats() {
             </div>
 
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{stat.label}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{stat.trend}</p>
+            {stat.trend ? (
+              <p className="text-xs text-slate-400 dark:text-slate-500">{stat.trend}</p>
+            ) : null}
           </div>
         );
       })}

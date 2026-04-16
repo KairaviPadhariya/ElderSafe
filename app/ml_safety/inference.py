@@ -11,10 +11,33 @@ from app.ml_safety.thresholds import classify_risk, derive_personalized_baseline
 from app.ml_safety.trainer import load_model
 
 
+LEGACY_FEATURE_DEFAULTS: dict[str, Any] = {
+    "has_copd": False,
+}
+
+
+def _align_features_for_model(model: Any, features: pd.DataFrame) -> pd.DataFrame:
+    aligned = features.copy()
+    expected_columns = getattr(model, "feature_names_in_", None)
+
+    if expected_columns is None:
+        for column, default_value in LEGACY_FEATURE_DEFAULTS.items():
+            if column not in aligned.columns:
+                aligned[column] = default_value
+        return aligned
+
+    for column in expected_columns:
+        if column not in aligned.columns:
+            aligned[column] = LEGACY_FEATURE_DEFAULTS.get(column, pd.NA)
+
+    return aligned
+
+
 def predict_situation(model_path: str | Path, patient_payload: dict[str, Any]) -> dict[str, Any]:
     model = load_model(model_path)
     frame = pd.DataFrame([patient_payload])
     features = add_engineered_features(frame)
+    features = _align_features_for_model(model, features)
     features[BOOLEAN_COLUMNS] = features[BOOLEAN_COLUMNS].astype("int64")
     prediction = model.predict(features)[0]
 

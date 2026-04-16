@@ -27,7 +27,7 @@ interface DoctorDashboardData {
   schedule: DashboardAppointment[];
 }
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
 const emptyDashboard: DoctorDashboardData = {
@@ -82,6 +82,19 @@ function formatAppointmentDate(date: string) {
     day: 'numeric',
     year: 'numeric'
   });
+}
+
+function getAppointmentDateTime(appointment: DashboardAppointment) {
+  return new Date(`${appointment.date}T${appointment.time}`);
+}
+
+function isUpcomingAppointment(appointment: DashboardAppointment, now = new Date()) {
+  if (appointment.status === 'cancelled') {
+    return false;
+  }
+
+  const appointmentDate = getAppointmentDateTime(appointment);
+  return !Number.isNaN(appointmentDate.getTime()) && appointmentDate >= now;
 }
 
 function getPatientInitials(name?: string) {
@@ -157,6 +170,11 @@ function DoctorDashboard({ userName }: Props) {
     { title: 'Total Appointments', value: dashboard.total_appointments.toString(), icon: Calendar, color: 'bg-cyan-500' },
     { title: 'Appointments Today', value: dashboard.appointments_today.toString(), icon: Clock, color: 'bg-emerald-500' },
   ]), [dashboard]);
+
+  const upcomingSchedule = useMemo(
+    () => dashboard.schedule.filter((appointment) => isUpcomingAppointment(appointment)),
+    [dashboard.schedule]
+  );
 
   const handleReschedule = async (id: string) => {
     if (!editDate || !editTime) {
@@ -252,7 +270,7 @@ function DoctorDashboard({ userName }: Props) {
             Appointment Schedule
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Upcoming and recorded appointments linked to your doctor profile
+            Upcoming appointments linked to your doctor profile
           </p>
         </div>
 
@@ -260,13 +278,13 @@ function DoctorDashboard({ userName }: Props) {
           <div className="p-6 text-slate-500 dark:text-slate-400">
             Loading dashboard data...
           </div>
-        ) : dashboard.schedule.length === 0 ? (
+        ) : upcomingSchedule.length === 0 ? (
           <div className="p-6 text-slate-500 dark:text-slate-400">
-            No appointments have been scheduled yet.
+            No upcoming appointments scheduled.
           </div>
         ) : (
           <div className="divide-y">
-            {dashboard.schedule.map((appointment) => (
+            {upcomingSchedule.map((appointment) => (
               <div key={appointment._id} className="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-100">

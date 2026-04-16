@@ -142,7 +142,7 @@ def get_default_times(frequency: str) -> list[str]:
 
     if "twice" in normalized:
         return ["08:00", "20:00"]
-    if "three" in normalized:
+    if "three" in normalized or "thrice" in normalized:
         return ["08:00", "14:00", "20:00"]
     if "four" in normalized:
         return ["06:00", "12:00", "18:00", "22:00"]

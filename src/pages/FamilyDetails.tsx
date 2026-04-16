@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HeartHandshake, ShieldCheck, UserRound, Phone, MapPin, Save } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 type Patient = {
     _id: string;
@@ -178,7 +178,6 @@ function FamilyDetails() {
                                     required
                                     value={formData.relation}
                                     onChange={handleChange}
-                                    placeholder="Son / Daughter / Spouse"
                                     className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
                                 />
                             </div>
@@ -208,7 +207,6 @@ function FamilyDetails() {
                                         name="phone"
                                         value={formData.phone}
                                         onChange={handleChange}
-                                        placeholder="+1 (555) 234-5678"
                                         className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <Phone className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
@@ -223,7 +221,6 @@ function FamilyDetails() {
                                         rows={3}
                                         value={formData.address}
                                         onChange={handleChange}
-                                        placeholder="456 Pine Street, Springfield, IL 62702"
                                         className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11"
                                     />
                                     <MapPin className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />

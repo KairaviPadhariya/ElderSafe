@@ -1,7 +1,7 @@
 import { Phone, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 type LocationDetails = {
   label: string;

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 interface LoginData {
   email: string;
@@ -24,7 +24,7 @@ export { decodeJWT };
 export const api = {
   async login(data: LoginData) {
     const formData = new URLSearchParams();
-    formData.append('username', data.email);  // OAuth2 uses 'username' for email
+    formData.append('username', data.email.trim());  // OAuth2 uses 'username' for email
     formData.append('password', data.password);
 
     const response = await fetch(`${API_BASE_URL}/login`, {
@@ -34,10 +34,15 @@ export const api = {
       },
       body: formData.toString(),
     });
+
+    const responseText = await response.text();
+    const responseData = responseText ? JSON.parse(responseText) : null;
+
     if (!response.ok) {
-      throw new Error('Login failed');
+      throw new Error(responseData?.detail || 'Login failed');
     }
-    return response.json();
+
+    return responseData;
   },
 
   async register(data: RegisterData) {

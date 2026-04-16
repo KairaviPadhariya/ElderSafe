@@ -3,7 +3,7 @@ import { Stethoscope, Mail, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 type Doctor = {
     _id?: string;

@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogResponse = {
@@ -42,6 +42,12 @@ type MultiLineChartCardProps = {
     values: ChartMetric[];
   }>;
   emptyMessage: string;
+};
+
+type RiskHistoryEntry = {
+  date: string;
+  prediction: 'normal' | 'warning' | 'emergency';
+  confidence: number;
 };
 
 async function requestJson(url: string, options: RequestInit = {}) {
@@ -95,6 +101,24 @@ function calculateTrend(values: number[]) {
   }
 
   return delta > 0 ? `Up ${delta.toFixed(1)}` : `Down ${Math.abs(delta).toFixed(1)}`;
+}
+
+function readRiskHistory() {
+  try {
+    const raw = localStorage.getItem('eldersafe-risk-history-current-patient');
+    if (!raw) {
+      return [] as RiskHistoryEntry[];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as RiskHistoryEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatRiskLabel(prediction: RiskHistoryEntry['prediction']) {
+  return prediction.charAt(0).toUpperCase() + prediction.slice(1);
 }
 
 function MultiLineChartCard({
@@ -275,7 +299,8 @@ function HealthTrends() {
   const [linkedPatientName, setLinkedPatientName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [timeRange, setTimeRange] = useState<'weekly' | 'monthly'>('weekly');
+  const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'risk'>('weekly');
+  const [riskHistory, setRiskHistory] = useState<RiskHistoryEntry[]>([]);
 
   const loadLogs = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -326,6 +351,19 @@ function HealthTrends() {
     loadLogs();
   }, [loadLogs]);
 
+  useEffect(() => {
+    const syncRiskHistory = () => {
+      setRiskHistory(readRiskHistory());
+    };
+
+    syncRiskHistory();
+    window.addEventListener('ml-history-updated', syncRiskHistory as EventListener);
+
+    return () => {
+      window.removeEventListener('ml-history-updated', syncRiskHistory as EventListener);
+    };
+  }, []);
+
   const filteredEntries = useMemo(() => {
     if (entries.length === 0) return [];
     
@@ -336,9 +374,9 @@ function HealthTrends() {
     const latestDate = new Date(`${latestDateStr}T00:00:00`);
     
     const cutoffDate = new Date(latestDate);
-    if (timeRange === 'weekly') {
+    if (selectedView === 'weekly') {
       cutoffDate.setDate(cutoffDate.getDate() - 6);
-    } else if (timeRange === 'monthly') {
+    } else if (selectedView === 'monthly') {
       cutoffDate.setDate(cutoffDate.getDate() - 29);
     }
     
@@ -346,7 +384,7 @@ function HealthTrends() {
       const entryDate = new Date(`${entry.log_date}T00:00:00`);
       return entryDate >= cutoffDate;
     });
-  }, [entries, timeRange]);
+  }, [entries, selectedView]);
 
   const chartData = useMemo(() => {
     const bloodPressure = filteredEntries.map((entry) => ({
@@ -429,9 +467,9 @@ function HealthTrends() {
           </div>
           <div className="flex p-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm w-fit">
             <button
-              onClick={() => setTimeRange('weekly')}
+              onClick={() => setSelectedView('weekly')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                timeRange === 'weekly'
+                selectedView === 'weekly'
                   ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
               }`}
@@ -439,14 +477,24 @@ function HealthTrends() {
               Weekly
             </button>
             <button
-              onClick={() => setTimeRange('monthly')}
+              onClick={() => setSelectedView('monthly')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                timeRange === 'monthly'
+                selectedView === 'monthly'
                   ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
               }`}
             >
               Monthly
+            </button>
+            <button
+              onClick={() => setSelectedView('risk')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                selectedView === 'risk'
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              Risk Timeline
             </button>
           </div>
         </div>
@@ -483,6 +531,46 @@ function HealthTrends() {
         {loading ? (
           <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400 shadow-sm">
             Loading health trends...
+          </div>
+        ) : selectedView === 'risk' ? (
+          <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
+                  Risk Timeline
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Recent ML prediction results tracked alongside your health trends.
+                </p>
+              </div>
+            </div>
+
+            {riskHistory.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                No risk history yet. Refresh the dashboard prediction card to start building a timeline.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {riskHistory.map((entry) => {
+                  const timelineClasses =
+                    entry.prediction === 'emergency'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                      : entry.prediction === 'warning'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
+
+                  return (
+                    <div
+                      key={`${entry.date}-${entry.prediction}`}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${timelineClasses}`}
+                    >
+                      {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} {formatRiskLabel(entry.prediction)} {Math.round(entry.confidence * 100)}%
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : entries.length === 0 ? (
           <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400 shadow-sm">

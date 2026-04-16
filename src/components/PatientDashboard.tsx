@@ -11,10 +11,11 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import HealthRiskPrediction from './HealthRiskPrediction';
 import QuickStats from './QuickStats';
 import SOSButton from './SOSButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
 interface Props {
@@ -39,6 +40,11 @@ type DailyHealthLog = {
   updated_at?: string;
 };
 
+type MedicalDocument = {
+  id?: string;
+  uploaded_at?: string;
+};
+
 type MedicationDose = {
   medicine_name: string;
   scheduled_label: string;
@@ -51,6 +57,12 @@ type MedicationSummary = {
   skipped_count: number;
   missed_count: number;
   next_dose?: MedicationDose | null;
+};
+
+type RiskHistoryEntry = {
+  date: string;
+  prediction: 'normal' | 'warning' | 'emergency';
+  confidence: number;
 };
 
 async function requestJson(url: string, options: RequestInit = {}) {
@@ -80,6 +92,24 @@ async function requestJson(url: string, options: RequestInit = {}) {
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+function readCurrentRiskHistory() {
+  try {
+    const raw = localStorage.getItem('eldersafe-risk-history-current-patient');
+    if (!raw) {
+      return [] as RiskHistoryEntry[];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as RiskHistoryEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatRiskLabel(prediction: RiskHistoryEntry['prediction']) {
+  return prediction.charAt(0).toUpperCase() + prediction.slice(1);
 }
 
 function getAppointmentDateTime(appointment: Appointment) {
@@ -183,9 +213,11 @@ function PatientDashboard({ userName }: Props) {
   const [appointmentError, setAppointmentError] = useState('');
   const [doctorCount, setDoctorCount] = useState<number | null>(null);
   const [lastHealthEntry, setLastHealthEntry] = useState('No entries yet');
+  const [lastDocumentEntry, setLastDocumentEntry] = useState('No documents yet');
   const [medicationSummary, setMedicationSummary] = useState<MedicationSummary | null>(null);
   const [medicationError, setMedicationError] = useState('');
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [riskHistory, setRiskHistory] = useState<RiskHistoryEntry[]>([]);
 
   useEffect(() => {
     if (userName) {
@@ -204,6 +236,19 @@ function PatientDashboard({ userName }: Props) {
     }, 60000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const syncRiskHistory = () => {
+      setRiskHistory(readCurrentRiskHistory());
+    };
+
+    syncRiskHistory();
+    window.addEventListener('ml-history-updated', syncRiskHistory as EventListener);
+
+    return () => {
+      window.removeEventListener('ml-history-updated', syncRiskHistory as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -286,6 +331,38 @@ function PatientDashboard({ userName }: Props) {
   }, []);
 
   useEffect(() => {
+    const loadLatestDocumentEntry = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLastDocumentEntry('Unavailable');
+        return;
+      }
+
+      try {
+        const data = await requestJson(`${API_BASE_URL}/medical-documents`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const documents = Array.isArray(data) ? (data as MedicalDocument[]) : [];
+        const latestTimestamp = documents
+          .map((document) => parseServerTimestamp(document.uploaded_at))
+          .filter((value): value is Date => value instanceof Date)
+          .sort((first, second) => second.getTime() - first.getTime())[0];
+
+        setLastDocumentEntry(latestTimestamp ? formatRelativeTime(latestTimestamp) : 'No documents yet');
+      } catch (error) {
+        console.error('Failed to load latest document entry:', error);
+        setLastDocumentEntry('Unavailable');
+      }
+    };
+
+    loadLatestDocumentEntry();
+  }, []);
+
+  useEffect(() => {
     const loadMedicationSummary = async () => {
       const token = localStorage.getItem('token');
 
@@ -339,6 +416,9 @@ function PatientDashboard({ userName }: Props) {
       : `${doctorCount} doctor${doctorCount === 1 ? '' : 's'}`;
 
   const healthEntryStats = `Last entry: ${lastHealthEntry}`;
+  const healthTrendStats = riskHistory.length > 0
+    ? `Recent risk: ${riskHistory.slice(-3).map((entry) => formatRiskLabel(entry.prediction)).join(' -> ')}`
+    : 'No risk history yet';
 
   const featureCards = [
     {
@@ -356,7 +436,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'View 7-day trends and patterns',
       icon: TrendingUp,
       color: 'bg-emerald-500',
-      stats: 'All vitals normal',
+      stats: healthTrendStats,
       path: '/health-trends'
     },
     {
@@ -392,7 +472,7 @@ function PatientDashboard({ userName }: Props) {
       description: 'Conditions, allergies, and past records',
       icon: FileText,
       color: 'bg-pink-500',
-      stats: 'Last updated: 1 week ago',
+      stats: `Last updated: ${lastDocumentEntry}`,
       path: '/medical-history'
     },
   ];
@@ -404,11 +484,12 @@ function PatientDashboard({ userName }: Props) {
           Welcome back, {name}
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg">
-          Here&apos;s your health overview for today
+          Here&apos;s your health overview
         </p>
       </div>
 
       <QuickStats />
+      <HealthRiskPrediction />
 
       <div className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
@@ -464,6 +545,28 @@ function PatientDashboard({ userName }: Props) {
                   <Activity className="w-4 h-4 mr-2" />
                   {card.stats}
                 </div>
+
+                {card.id === 'health-tracker' && riskHistory.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {riskHistory.slice(-4).map((entry) => {
+                      const timelineClasses =
+                        entry.prediction === 'emergency'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                          : entry.prediction === 'warning'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
+
+                      return (
+                        <span
+                          key={`${entry.date}-${entry.prediction}`}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${timelineClasses}`}
+                        >
+                          {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} {formatRiskLabel(entry.prediction)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             </button>
           );

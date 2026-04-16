@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Heart, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { decodeJWT } from '../utils/api';
+import { api, decodeJWT } from '../utils/api';
 
 function Login() {
     const [email, setEmail] = useState("");
@@ -18,28 +18,22 @@ const handleLogin = async (e: React.FormEvent) => {
   setLoading(true);
   setError("");
 
+  const normalizedEmail = email.trim();
+
   try {
-    const response = await fetch("http://127.0.0.1:8000/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        username: email,
-        password: password
-      })
+    const data = await api.login({
+      email: normalizedEmail,
+      password
     });
 
-    const data = await response.json();
-
-    if (response.ok && data.access_token) {
-      const fallbackUserName = email.split("@")[0] || email || "User";
+    if (data.access_token) {
+      const fallbackUserName = normalizedEmail.split("@")[0] || normalizedEmail || "User";
 
       // Save token
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("isAuthenticated", "true");
       localStorage.setItem("userName", fallbackUserName);
-      localStorage.setItem("userEmail", email);
+      localStorage.setItem("userEmail", normalizedEmail);
 
       // Decode JWT
       const decoded = decodeJWT(data.access_token);
@@ -50,7 +44,7 @@ const handleLogin = async (e: React.FormEvent) => {
       }
 
       try {
-        const userResponse = await fetch("http://127.0.0.1:8000/users/me", {
+        const userResponse = await fetch("http://34.233.187.127:8000/users/me", {
           headers: {
             Authorization: `Bearer ${data.access_token}`
           }
@@ -66,8 +60,8 @@ const handleLogin = async (e: React.FormEvent) => {
                 userData.full_name ||
                 userData.username ||
                 userData.email?.split("@")[0] ||
-                email.split("@")[0] ||
-                email ||
+                normalizedEmail.split("@")[0] ||
+                normalizedEmail ||
                 "User";
 
               localStorage.setItem("userName", resolvedUserName);
@@ -84,7 +78,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
       // Remember email
       if (rememberMe) {
-        localStorage.setItem("rememberEmail", email);
+        localStorage.setItem("rememberEmail", normalizedEmail);
       } else {
         localStorage.removeItem("rememberEmail");
       }
@@ -98,7 +92,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
   } catch (error) {
     console.error("Login error:", error);
-    setError("Server error. Check backend.");
+    setError(error instanceof Error ? error.message : "Server error. Check backend.");
   }
 
   setLoading(false);

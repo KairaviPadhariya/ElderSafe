@@ -220,7 +220,7 @@ function LandingPage() {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Office</h4>
-                                        <p className="text-slate-600">Bangalore, Karnataka 560001</p>
+                                        <p className="text-slate-600">Gujarat, India</p>
                                     </div>
                                 </div>
                             </div>

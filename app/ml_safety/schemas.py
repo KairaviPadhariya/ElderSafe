@@ -22,7 +22,6 @@ class SafetyPredictionRequest(BaseModel):
     cholesterol: float
     has_hypertension: bool = False
     has_diabetes: bool = False
-    has_copd: bool = False
     has_cardiac_history: bool = False
 
 

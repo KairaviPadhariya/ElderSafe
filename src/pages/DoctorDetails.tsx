@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, FileText, Mail, Phone, Save, Stethoscope, UserRound } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 function DoctorDetails() {
     const navigate = useNavigate();

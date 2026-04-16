@@ -4,7 +4,7 @@ import { Save, Activity, Heart, Droplets, FileText } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogFormState = {
@@ -97,6 +97,7 @@ function DailyLogs() {
     const [successMessage, setSuccessMessage] = useState('');
     const [linkedPatientName, setLinkedPatientName] = useState('');
     const [dailyEntries, setDailyEntries] = useState<DailyLogResponse[]>([]);
+    const [showPastEntries, setShowPastEntries] = useState(false);
     const todayDate = getTodayDate();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -238,12 +239,25 @@ function DailyLogs() {
                 </div>
 
                 <div className="mb-8 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <div className="flex items-center gap-2 mb-4">
-                        <FileText className="w-5 h-5 text-emerald-500" />
-                        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">View Daily Entries</h2>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-emerald-500" />
+                            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Past Daily Entries</h2>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowPastEntries((current) => !current)}
+                            className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                        >
+                            {showPastEntries ? 'Hide Past Entries' : 'View Past Entries'}
+                        </button>
                     </div>
 
-                    {dailyEntries.length === 0 ? (
+                    {!showPastEntries ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Past daily logs are hidden by default. Click &quot;View Past Entries&quot; to see earlier records.
+                        </p>
+                    ) : dailyEntries.length === 0 ? (
                         <p className="text-sm text-slate-500 dark:text-slate-400">No daily log entries found yet.</p>
                     ) : (
                         <div className="overflow-x-auto">
