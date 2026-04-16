@@ -10,7 +10,7 @@ export const registerUser = async (name: string, email: string, password: string
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || "Registration failed");
   }
 
@@ -19,8 +19,8 @@ export const registerUser = async (name: string, email: string, password: string
 
 export const loginUser = async (email: string, password: string) => {
   const formData = new URLSearchParams();
-  formData.append('username', email);
-  formData.append('password', password);
+  formData.append("username", email);
+  formData.append("password", password);
 
   const response = await fetch(`${API_URL}/login`, {
     method: "POST",
@@ -29,6 +29,11 @@ export const loginUser = async (email: string, password: string) => {
     },
     body: formData.toString()
   });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Login failed");
+  }
 
   return response.json();
 };
@@ -41,6 +46,11 @@ export const getNotifications = async () => {
       Authorization: `Bearer ${token}`
     }
   });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to fetch notifications");
+  }
 
   return response.json();
 };
@@ -57,7 +67,12 @@ export const uploadDocument = async (file: File) => {
       Authorization: `Bearer ${token}`
     },
     body: formData
-  }); 
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Document upload failed");
+  }
 
   return response.json();
 };
