@@ -16,7 +16,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # -------- PASSWORD HASH --------
 def hash_password(password: str):
-    return pwd_context.hash(password)
+    return pwd_context.hash(password[:72])
 
 
 @router.post("/forgot-password/check-email")
