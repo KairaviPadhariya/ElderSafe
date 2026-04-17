@@ -3,6 +3,7 @@ import { FileText, Loader2, Upload } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 20000;
@@ -209,6 +210,21 @@ function MedicalHistory() {
                 throw new Error(data?.detail || data?.message || 'Upload failed');
             }
 
+            await logActivitySafely({
+                action: 'medical_document_uploaded',
+                activity_type: 'medical_document',
+                description: `${selectedFile.name} uploaded to medical documents.`,
+                metadata: {
+                    document_id: data?.id || null,
+                    filename: selectedFile.name,
+                    file_size: selectedFile.size,
+                    file_type: selectedFile.type || null,
+                    actor_role: role,
+                    patient_id: isDoctorView ? selectedPatientId || null : null,
+                    patient_name: isDoctorView ? selectedPatientName || null : null
+                }
+            });
+
             setSuccessMessage(`${selectedFile.name} uploaded successfully.`);
             setSelectedFile(null);
             const fileInput = document.getElementById('medical-document-file') as HTMLInputElement | null;
@@ -237,12 +253,15 @@ function MedicalHistory() {
         setSelectedDocumentId(documentRecord.id);
 
         try {
+<<<<<<< Updated upstream
             await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
                 ...(isDoctorView && selectedPatientId
                     ? { headers: { Authorization: `Bearer ${token}` } }
                     : { headers: { Authorization: `Bearer ${token}` } })
             });
 
+=======
+>>>>>>> Stashed changes
             const previewUrl = new URL(`${API_BASE_URL}/medical-documents/${documentRecord.id}`);
             if (isDoctorView && selectedPatientId) {
                 previewUrl.searchParams.set('patient_id', selectedPatientId);

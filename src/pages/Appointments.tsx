@@ -2,6 +2,7 @@ import { Calendar, Clock, MapPin, Plus, Edit2, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react';
 
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
@@ -248,7 +249,7 @@ function Appointments() {
         setError('');
 
         try {
-            await requestJson(`${API_BASE_URL}/appointments`, {
+            const savedAppointment = await requestJson(`${API_BASE_URL}/appointments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -264,6 +265,22 @@ function Appointments() {
                     reason: newAppointment.specialty || 'General appointment',
                     status: 'upcoming'
                 })
+            });
+
+            await logActivitySafely({
+                action: 'appointment_created',
+                activity_type: 'appointment',
+                description: `Appointment booked with ${newAppointment.doctor} for ${newAppointment.date} at ${newAppointment.time}.`,
+                metadata: {
+                    appointment_id: savedAppointment?._id || savedAppointment?.id || null,
+                    doctor_id: newAppointment.doctorId,
+                    doctor_name: newAppointment.doctor,
+                    specialty: newAppointment.specialty,
+                    date: newAppointment.date,
+                    time: newAppointment.time,
+                    location: newAppointment.location,
+                    actor_role: role
+                }
             });
 
             await loadAppointments();
@@ -294,6 +311,7 @@ function Appointments() {
         setError('');
 
         try {
+            const existingAppointment = appointments.find((appointment) => (appointment._id ?? appointment.id) === id);
             const data = await requestJson(`${API_BASE_URL}/appointments/${id}`, {
                 method: 'PUT',
                 headers: {
@@ -305,6 +323,22 @@ function Appointments() {
                     time: rescheduleData.time,
                     status: 'upcoming'
                 })
+            });
+
+            await logActivitySafely({
+                action: 'appointment_rescheduled',
+                activity_type: 'appointment',
+                description: `Appointment moved to ${rescheduleData.date} at ${rescheduleData.time}.`,
+                metadata: {
+                    appointment_id: id,
+                    previous_date: existingAppointment?.date || null,
+                    previous_time: existingAppointment?.time || null,
+                    new_date: rescheduleData.date,
+                    new_time: rescheduleData.time,
+                    doctor_name: existingAppointment?.doctor_name || null,
+                    patient_name: existingAppointment?.patient_name || null,
+                    actor_role: role
+                }
             });
 
             setAppointments((current) =>
@@ -332,10 +366,26 @@ function Appointments() {
         setError('');
 
         try {
+            const existingAppointment = appointments.find((appointment) => (appointment._id ?? appointment.id) === id);
             await requestJson(`${API_BASE_URL}/appointments/${id}`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`
+                }
+            });
+
+            await logActivitySafely({
+                action: 'appointment_cancelled',
+                activity_type: 'appointment',
+                description: `Appointment cancelled for ${existingAppointment?.date || 'the scheduled date'} at ${existingAppointment?.time || 'the scheduled time'}.`,
+                metadata: {
+                    appointment_id: id,
+                    doctor_name: existingAppointment?.doctor_name || null,
+                    patient_name: existingAppointment?.patient_name || null,
+                    date: existingAppointment?.date || null,
+                    time: existingAppointment?.time || null,
+                    location: existingAppointment?.location || null,
+                    actor_role: role
                 }
             });
 

@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Clipboard, FileText, Lock, Save, Scale, Thermometer, TrendingUp, User } from 'lucide-react';
 import BackButton from '../components/BackButton';
+<<<<<<< Updated upstream
 import { resolveLinkedPatient } from '../utils/patientData';
+=======
+import { logActivitySafely } from '../utils/logging';
+>>>>>>> Stashed changes
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
@@ -547,6 +551,24 @@ function MedicalDetails() {
             if (!response.ok) {
                 throw new Error(responseData?.detail || 'Failed to save medical details.');
             }
+
+            await logActivitySafely({
+                action: 'medical_profile_saved',
+                activity_type: 'medical_profile',
+                description: 'Medical profile saved or updated.',
+                metadata: {
+                    profile_name: name,
+                    age: Number(formData.age),
+                    gender: formData.gender,
+                    blood_group: formData.bloodGroup,
+                    height: Number(formData.height),
+                    weight: Number(formData.weight),
+                    bmi: formData.bmi ? Number(formData.bmi) : null,
+                    has_bp: formData.hasBp ? formData.hasBp === 'yes' : null,
+                    has_diabetes: formData.hasDiabetes ? formData.hasDiabetes === 'yes' : null,
+                    latest_daily_log_date: latestDailyLogDate || null
+                }
+            });
 
             setHasSavedProfile(true);
             setIsEditingDetails(false);

@@ -314,7 +314,7 @@ function FamilyDashboard({ userName }: Props) {
 
                 const matchedPatient = resolveLinkedPatient(patients, resolvedFamilyRecord);
                 const unresolvedAlerts = sosAlerts.filter((alert) => alert.status !== 'resolved');
-                const patientId = matchedPatient?._id || matchedPatient?.user_id || resolvedFamilyRecord.patient_id;
+                const patientId = matchedPatient?._id || matchedPatient?.user_id || resolvedFamilyRecord?.patient_id || null;
                 let latestLog: DailyHealthLog | null = null;
 
                 if (patientId) {

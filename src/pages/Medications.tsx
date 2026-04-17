@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pill, Clock, CalendarCheck, Plus, CheckCircle2, SkipForward, AlertTriangle } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
@@ -182,7 +183,7 @@ function Medications() {
         .map((value) => value.trim())
         .filter(Boolean);
 
-      await requestJson(`${API_BASE_URL}/medications`, {
+      const savedMedication = await requestJson(`${API_BASE_URL}/medications`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -197,6 +198,21 @@ function Medications() {
           start_date: formData.start_date,
           duration_days: Number.parseInt(formData.duration_days, 10)
         })
+      });
+
+      await logActivitySafely({
+        action: 'medication_created',
+        activity_type: 'medication',
+        description: `Medication ${formData.medicine_name} was added to the schedule.`,
+        metadata: {
+          medication_id: savedMedication?._id || null,
+          medicine_name: formData.medicine_name,
+          dosage: formData.dosage,
+          frequency: formData.frequency,
+          times,
+          start_date: formData.start_date,
+          duration_days: Number.parseInt(formData.duration_days, 10)
+        }
       });
 
       setFormData({
@@ -241,6 +257,21 @@ function Medications() {
           status,
           log_date: dose.log_date
         })
+      });
+
+      await logActivitySafely({
+        action: 'medication_status_updated',
+        activity_type: 'medication_dose',
+        description: `${dose.medicine_name} marked as ${status}.`,
+        metadata: {
+          medication_id: dose.medication_id,
+          medicine_name: dose.medicine_name,
+          dosage: dose.dosage,
+          scheduled_time: dose.scheduled_time,
+          scheduled_label: dose.scheduled_label,
+          log_date: dose.log_date,
+          status
+        }
       });
 
       setFeedback(`${dose.medicine_name} marked as ${status}.`);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Save, Activity, Heart, Droplets, FileText } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
+import { createActivityLog } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
@@ -195,7 +196,7 @@ function DailyLogs() {
         setLoading(true);
 
         try {
-            await requestJson(`${API_BASE_URL}/daily_health_logs`, {
+            const savedLog = await requestJson(`${API_BASE_URL}/daily_health_logs`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -212,6 +213,26 @@ function DailyLogs() {
                     temperature: formData.temperature ? Number(formData.temperature) : null,
                     notes: formData.notes.trim() || null
                 })
+            });
+
+            await createActivityLog({
+                action: 'daily_health_log_saved',
+                activity_type: 'daily_health_log',
+                description: `${isFamilyView ? 'Family member' : 'Patient'} saved a daily health log for ${todayDate}.`,
+                metadata: {
+                    patient_name: linkedPatientName || localStorage.getItem('userName') || 'Unknown user',
+                    log_date: todayDate,
+                    systolic_bp: Number(formData.systolicBp),
+                    diastolic_bp: Number(formData.diastolicBp),
+                    heart_rate: Number(formData.heartRate),
+                    o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
+                    fasting_blood_glucose: formData.fastingBloodGlucose ? Number(formData.fastingBloodGlucose) : null,
+                    post_prandial_glucose: formData.postPrandialGlucose ? Number(formData.postPrandialGlucose) : null,
+                    temperature: formData.temperature ? Number(formData.temperature) : null,
+                    notes_present: Boolean(formData.notes.trim()),
+                    actor_role: role,
+                    saved_log_id: savedLog?._id || null
+                }
             });
 
             setSuccessMessage(`${isFamilyView ? 'Patient' : 'Health'} log saved for ${todayDate}.`);

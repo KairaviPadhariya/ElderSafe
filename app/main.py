@@ -9,6 +9,7 @@ from app.routes import (
     appointments,
     medications,
     activity_logs,
+    contact_logs,
     audit_logs,
     family,
     daily_health_logs,
@@ -44,6 +45,7 @@ app.include_router(doctors.router)
 app.include_router(appointments.router)
 app.include_router(medications.router)
 app.include_router(activity_logs.router)
+app.include_router(contact_logs.router)
 app.include_router(audit_logs.router)
 app.include_router(family.router)
 app.include_router(daily_health_logs.router)
