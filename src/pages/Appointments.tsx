@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import BackButton from '../components/BackButton';
 import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 type Appointment = {
     _id?: string;
@@ -466,7 +467,7 @@ function Appointments() {
             frequency: 'Once daily',
             times: getDefaultTimesForFrequency('Once daily'),
             instructions: '',
-            startDate: appointment.date || new Date().toISOString().slice(0, 10),
+            startDate: new Date().toISOString().slice(0, 10),
             durationDays: '30',
         });
         setError('');

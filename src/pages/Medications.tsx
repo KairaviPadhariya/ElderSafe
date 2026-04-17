@@ -4,7 +4,8 @@ import { Pill, Clock, CalendarCheck, CheckCircle2, SkipForward, AlertTriangle } 
 import BackButton from '../components/BackButton';
 import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
 type Medication = {
@@ -76,7 +77,6 @@ async function requestJson(url: string, options: RequestInit = {}) {
 }
 
 function Medications() {
-  const role = localStorage.getItem('userRole') || 'patient';
   const [medications, setMedications] = useState<Medication[]>([]);
   const [schedule, setSchedule] = useState<Dose[]>([]);
   const [summary, setSummary] = useState<ScheduleSummary | null>(null);
@@ -199,12 +199,6 @@ function Medications() {
         {feedback && (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {feedback}
-          </div>
-        )}
-
-        {role === 'patient' && (
-          <div className="mb-8 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            Your doctor now manages medication plans. You can update each dose below as taken, skipped, or missed.
           </div>
         )}
 
