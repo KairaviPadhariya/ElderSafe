@@ -467,7 +467,7 @@ function Appointments() {
             frequency: 'Once daily',
             times: getDefaultTimesForFrequency('Once daily'),
             instructions: '',
-            startDate: new Date().toISOString().slice(0, 10),
+            startDate: appointment.date || new Date().toISOString().slice(0, 10),
             durationDays: '30',
         });
         setError('');
@@ -857,16 +857,19 @@ function Appointments() {
                                                 Prescription for {appointmentName}
                                             </h5>
                                         </div>
+                                        <div className="mb-4 rounded-xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-emerald-900/40 dark:bg-slate-900/30 dark:text-slate-300">
+                                            Appointment date: <span className="font-semibold text-slate-900 dark:text-white">{apt.date}</span>
+                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Doctor note</label>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Prescription note</label>
                                                 <textarea
                                                     name="doctorNote"
                                                     rows={3}
                                                     value={prescriptionData.doctorNote}
                                                     onChange={handlePrescriptionFieldChange}
                                                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-                                                    placeholder="Consultation note or advice for this appointment"
+                                                    placeholder="Doctor's note, diagnosis, or advice for this prescription"
                                                 />
                                             </div>
                                             <div>
@@ -906,7 +909,7 @@ function Appointments() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Start date</label>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Prescription date</label>
                                                 <input
                                                     type="date"
                                                     name="startDate"
@@ -961,7 +964,7 @@ function Appointments() {
                                                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
                                             >
                                                 <FileText className="w-4 h-4" />
-                                                {prescriptionSavingId === appointmentId ? 'Saving...' : 'Save Note & Medication'}
+                                                {prescriptionSavingId === appointmentId ? 'Saving...' : 'Save Prescription'}
                                             </button>
                                             <button
                                                 onClick={() => setPrescribingId(null)}

@@ -15,7 +15,8 @@ import HealthRiskPrediction from './HealthRiskPrediction';
 import QuickStats from './QuickStats';
 import SOSButton from './SOSButton';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
 interface Props {
@@ -212,6 +213,7 @@ function PatientDashboard({ userName }: Props) {
   const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
   const [appointmentError, setAppointmentError] = useState('');
   const [doctorCount, setDoctorCount] = useState<number | null>(null);
+  const [doctorCountError, setDoctorCountError] = useState('');
   const [lastHealthEntry, setLastHealthEntry] = useState('No entries yet');
   const [lastDocumentEntry, setLastDocumentEntry] = useState('No documents yet');
   const [medicationSummary, setMedicationSummary] = useState<MedicationSummary | null>(null);
@@ -321,9 +323,11 @@ function PatientDashboard({ userName }: Props) {
         const data = await requestJson(`${API_BASE_URL}/doctors`);
         const doctors = Array.isArray(data) ? data : [];
         setDoctorCount(doctors.length);
+        setDoctorCountError('');
       } catch (error) {
         console.error('Failed to load doctors count:', error);
         setDoctorCount(null);
+        setDoctorCount(error instanceof Error ? error.message : 'Unable to load doctors.');
       }
     };
 
@@ -410,7 +414,7 @@ function PatientDashboard({ userName }: Props) {
       : medicationError || 'Add medications to start getting daily reminders.';
 
   const doctorStats = doctorCount === null
-    ? 'Doctors unavailable'
+    ? doctorCountError || 'Doctors unavailable'
     : doctorCount === 0
       ? 'No doctors added'
       : `${doctorCount} doctor${doctorCount === 1 ? '' : 's'}`;

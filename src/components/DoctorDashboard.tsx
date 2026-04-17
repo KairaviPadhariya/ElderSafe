@@ -4,6 +4,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface Props {
   userName?: string;
@@ -267,12 +268,28 @@ function DoctorDashboard({ userName }: Props) {
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border overflow-hidden">
         <div className="p-6 border-b">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-            Appointment Schedule
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Upcoming appointments linked to your doctor profile
-          </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Appointment Schedule
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Upcoming appointments linked to your doctor profile
+              </p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-100 lg:max-w-sm">
+              <p className="font-medium">Need to add notes or medications?</p>
+              <p className="mt-1 text-emerald-800/80 dark:text-emerald-100/80">
+                Open the appointments page and use <span className="font-semibold">Add Note &amp; Medication</span> on the patient&apos;s card.
+              </p>
+              <Link
+                to="/appointments"
+                className="mt-3 inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                Open Appointments
+              </Link>
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -343,12 +360,20 @@ function DoctorDashboard({ userName }: Props) {
                       </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => startReschedule(appointment)}
-                      className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
-                    >
-                      Reschedule
-                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        onClick={() => startReschedule(appointment)}
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
+                      >
+                        Reschedule
+                      </button>
+                      <Link
+                        to="/appointments"
+                        className="px-4 py-2 bg-emerald-500 text-center rounded-lg text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                      >
+                        Add Note &amp; Medication
+                      </Link>
+                    </div>
                   )}
                 </div>
               </div>
