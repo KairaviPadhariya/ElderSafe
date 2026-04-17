@@ -12,7 +12,6 @@ interface RegisterData {
   role: string;
 }
 
-// Function to decode JWT payload (without verification)
 function decodeJWT(token: string) {
   const payload = token.split('.')[1];
   const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
