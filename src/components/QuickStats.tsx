@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Heart, Activity, Droplet, Stethoscope } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
+import { Heart, Droplet, Stethoscope } from 'lucide-react';
 
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 import { getWeeklyAverageVitals, roundAverage } from '../utils/patientData';
@@ -54,6 +55,18 @@ type MetricStatusMap = {
 
 interface QuickStatsProps {
   patientId?: string | null;
+}
+
+function OxygenIcon(props: LucideProps) {
+  return (
+    <div
+      className={props.className}
+      style={props.style}
+      aria-hidden="true"
+    >
+      <span className="text-[0.95rem] font-bold leading-none">O2</span>
+    </div>
+  );
 }
 
 async function requestJson(url: string, options: RequestInit = {}) {
@@ -392,7 +405,7 @@ function QuickStats({ patientId }: QuickStatsProps) {
         label: 'Oxygen Level',
         value: weeklyMetrics.averageOxygen?.toString() || '--',
         unit: '%',
-        icon: Activity,
+        icon: OxygenIcon,
         status: metricStatuses.oxygenLevel,
         trend: '',
         gradient: 'from-violet-400 to-violet-600'

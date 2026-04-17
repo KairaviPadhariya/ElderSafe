@@ -7,6 +7,11 @@ import BackButton from '../components/BackButton';
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const API_BASE_URL_CANDIDATES = Array.from(new Set([
+  API_BASE_URL,
+  DEFAULT_API_BASE_URL,
+  'http://34.233.187.127:8000'
+].map((value) => value.replace(/\/$/, ''))));
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogResponse = {
@@ -80,6 +85,30 @@ async function requestJson(url: string, options: RequestInit = {}) {
   }
 }
 
+async function requestJsonWithBaseFallback(path: string, options: RequestInit = {}) {
+  let lastError: unknown = null;
+
+  for (const baseUrl of API_BASE_URL_CANDIDATES) {
+    try {
+      return await requestJson(`${baseUrl}${path}`, options);
+    } catch (error) {
+      lastError = error;
+
+      if (!(error instanceof TypeError)) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw new Error(
+      `Could not connect to the health trends backend. Tried ${API_BASE_URL_CANDIDATES.join(', ')}. ${lastError.message}`
+    );
+  }
+
+  throw new Error(`Could not connect to the health trends backend. Tried ${API_BASE_URL_CANDIDATES.join(', ')}.`);
+}
+
 function formatDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
   return parsed.toLocaleDateString(undefined, {
@@ -119,6 +148,47 @@ function getLocalDateKey(value: string) {
   const month = String(parsed.getMonth() + 1).padStart(2, '0');
   const day = String(parsed.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getRiskCalendarMonth(entries: RiskHistoryEntry[]) {
+  const latestEntry = entries[entries.length - 1];
+  const baseDate = latestEntry ? new Date(latestEntry.date) : new Date();
+
+  if (Number.isNaN(baseDate.getTime())) {
+    return new Date();
+  }
+
+  return new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+}
+
+function buildRiskCalendarDays(monthDate: Date, entries: RiskHistoryEntry[]) {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  const calendarEnd = new Date(monthEnd);
+  calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
+
+  const latestEntryByDate = new Map(entries.map((entry) => [getLocalDateKey(entry.date), entry]));
+  const days: Array<{
+    key: string;
+    dateNumber: number;
+    isCurrentMonth: boolean;
+    entry?: RiskHistoryEntry;
+  }> = [];
+
+  for (let cursor = new Date(calendarStart); cursor <= calendarEnd; cursor.setDate(cursor.getDate() + 1)) {
+    const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    days.push({
+      key: dateKey,
+      dateNumber: cursor.getDate(),
+      isCurrentMonth: cursor.getMonth() === monthDate.getMonth(),
+      entry: latestEntryByDate.get(dateKey),
+    });
+  }
+
+  return days;
 }
 
 function MultiLineChartCard({
@@ -315,7 +385,7 @@ function HealthTrends() {
 
     try {
       if (isFamilyView) {
-        const familyData = await requestJson(`${API_BASE_URL}/family/me`, {
+        const familyData = await requestJsonWithBaseFallback('/family/me', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -331,15 +401,16 @@ function HealthTrends() {
         setLinkedPatientId('');
       }
 
-      const url = new URL(`${API_BASE_URL}/daily_health_logs`);
+      const query = new URLSearchParams();
 
       if (isDoctorView && selectedPatientId) {
-        url.searchParams.set('patient_id', selectedPatientId);
+        query.set('patient_id', selectedPatientId);
       } else if (isFamilyView && (familyPatientId || linkedPatientId)) {
-        url.searchParams.set('patient_id', familyPatientId || linkedPatientId);
+        query.set('patient_id', familyPatientId || linkedPatientId);
       }
 
-      const logs = await requestJson(url.toString(), {
+      const logsPath = query.toString() ? `/daily_health_logs?${query.toString()}` : '/daily_health_logs';
+      const logs = await requestJsonWithBaseFallback(logsPath, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -349,14 +420,15 @@ function HealthTrends() {
       normalizedLogs.sort((left, right) => left.log_date.localeCompare(right.log_date));
       setEntries(normalizedLogs);
 
-      const trendsUrl = new URL(`${API_BASE_URL}/health_trends`);
+      const trendsQuery = new URLSearchParams();
       if (isDoctorView && selectedPatientId) {
-        trendsUrl.searchParams.set('patient_id', selectedPatientId);
+        trendsQuery.set('patient_id', selectedPatientId);
       } else if (isFamilyView && (familyPatientId || linkedPatientId)) {
-        trendsUrl.searchParams.set('patient_id', familyPatientId || linkedPatientId);
+        trendsQuery.set('patient_id', familyPatientId || linkedPatientId);
       }
 
-      const trends = await requestJson(trendsUrl.toString(), {
+      const trendsPath = trendsQuery.toString() ? `/health_trends?${trendsQuery.toString()}` : '/health_trends';
+      const trends = await requestJsonWithBaseFallback(trendsPath, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -404,6 +476,26 @@ function HealthTrends() {
 
     return Array.from(latestRiskByDay.values()).reverse();
   }, [riskHistory]);
+
+  const riskCalendarMonth = useMemo(() => getRiskCalendarMonth(dailyRiskHistory), [dailyRiskHistory]);
+  const riskCalendarDays = useMemo(
+    () => buildRiskCalendarDays(riskCalendarMonth, dailyRiskHistory),
+    [dailyRiskHistory, riskCalendarMonth]
+  );
+  const riskLegend = [
+    {
+      label: 'Normal',
+      classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+    },
+    {
+      label: 'Warning',
+      classes: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+    },
+    {
+      label: 'Emergency',
+      classes: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+    }
+  ];
 
   const filteredEntries = useMemo(() => {
     if (entries.length === 0) return [];
@@ -592,25 +684,69 @@ function HealthTrends() {
                 No risk history yet. Refresh the dashboard prediction card to start building a timeline.
               </div>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                {dailyRiskHistory.map((entry) => {
-                  const timelineClasses =
-                    entry.prediction === 'emergency'
-                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
-                      : entry.prediction === 'warning'
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
+              <>
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {riskCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      One saved prediction per day, using the latest prediction for that date.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {riskLegend.map((item) => (
+                      <span key={item.label} className={`rounded-full px-3 py-1 text-xs font-semibold ${item.classes}`}>
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
 
-                  return (
-                    <div
-                      key={`${entry.date}-${entry.prediction}`}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${timelineClasses}`}
-                    >
-                      {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} {formatRiskLabel(entry.prediction)} {Math.round(entry.confidence * 100)}%
+                <div className="grid grid-cols-7 gap-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="px-2 py-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      {day}
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+
+                  {riskCalendarDays.map((day) => {
+                    const predictionClasses = !day.entry
+                      ? 'bg-slate-50 text-slate-400 dark:bg-slate-900/40 dark:text-slate-500'
+                      : day.entry.prediction === 'emergency'
+                        ? 'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50'
+                        : day.entry.prediction === 'warning'
+                          ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50'
+                          : 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/50';
+
+                    return (
+                      <div
+                        key={day.key}
+                        className={`min-h-[92px] rounded-2xl p-3 ${predictionClasses} ${day.isCurrentMonth ? '' : 'opacity-45'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm font-semibold">{day.dateNumber}</span>
+                          {day.entry ? (
+                            <span className="text-[11px] font-bold uppercase tracking-wide">
+                              {day.entry.prediction.slice(0, 1)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {day.entry ? (
+                          <div className="mt-4">
+                            <p className="text-xs font-semibold">
+                              {formatRiskLabel(day.entry.prediction)}
+                            </p>
+                            <p className="mt-1 text-xs opacity-80">
+                              {Math.round(day.entry.confidence * 100)}%
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         ) : entries.length === 0 ? (

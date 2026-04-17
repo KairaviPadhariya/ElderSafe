@@ -273,13 +273,7 @@ function MedicalDetails() {
     const [linkedPatientName, setLinkedPatientName] = useState('');
     const [formData, setFormData] = useState<FormData>(initialFormData);
     const [isEditingDetails, setIsEditingDetails] = useState(false);
-    const [lockedFields, setLockedFields] = useState<Partial<Record<keyof FormData, boolean>>>({});
-    const isFieldLocked = (field: keyof FormData) => (
-        hasSavedProfile
-        && isEditingDetails
-        && field !== 'weight'
-        && Boolean(lockedFields[field])
-    );
+    const isFieldLocked = (_field: keyof FormData) => false;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -351,14 +345,12 @@ function MedicalDetails() {
                 setError('');
                 setHasSavedProfile(Boolean(patientData));
                 setFormData(mapPatientToFormData(patientData));
-                setLockedFields({});
                 setIsEditingDetails(false);
             } catch (loadError) {
                 console.error('Failed to load patient medical details:', loadError);
                 setError(loadError instanceof Error ? loadError.message : 'Unable to load medical details.');
                 setHasSavedProfile(false);
                 setFormData({ ...initialFormData, sbp: '', dbp: '' });
-                setLockedFields({});
                 setIsEditingDetails(false);
             } finally {
                 setPatientLoading(false);
@@ -557,7 +549,6 @@ function MedicalDetails() {
             }
 
             setHasSavedProfile(true);
-            setLockedFields({});
             setIsEditingDetails(false);
             setLoading(false);
             navigate('/dashboard');
@@ -636,26 +627,10 @@ function MedicalDetails() {
                         )}
 
                         {hasIncompleteSavedProfile && !isEditingDetails ? (
-                            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
                                 <p>
                                     Missing medical details: {missingMedicalFields.join(', ')}.
                                 </p>
-                                <div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setLockedFields(
-                                                Object.fromEntries(
-                                                    Object.entries(formData).map(([key, value]) => [key, Boolean(value)])
-                                                ) as Partial<Record<keyof FormData, boolean>>
-                                            );
-                                            setIsEditingDetails(true);
-                                        }}
-                                        className="rounded-xl bg-amber-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-amber-700"
-                                    >
-                                        Edit Details
-                                    </button>
-                                </div>
                             </div>
                         ) : null}
 
@@ -711,6 +686,17 @@ function MedicalDetails() {
                                             icon={<Thermometer className="w-5 h-5" />}
                                             rows={clinicalRows}
                                         />
+                                        {!isFamilyView && hasSavedProfile ? (
+                                            <div className="lg:col-span-3 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsEditingDetails(true)}
+                                                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                                                >
+                                                    Edit Details
+                                                </button>
+                                            </div>
+                                        ) : null}
                                     </>
                                 ) : (
                                     <>

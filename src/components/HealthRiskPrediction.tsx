@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Siren, Stethoscope } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Siren } from 'lucide-react';
 
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 
@@ -683,6 +683,9 @@ function HealthRiskPrediction({
       return {
         badgeClasses: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
         panelClasses: 'border-rose-200/80 bg-gradient-to-br from-rose-50 via-white to-orange-50 dark:border-rose-900/60 dark:from-rose-950/40 dark:via-slate-900 dark:to-slate-900',
+        accentIconClasses: 'bg-rose-500 text-white shadow-rose-500/25 dark:bg-rose-500 dark:text-white',
+        statusIconClasses: 'text-rose-500 dark:text-rose-400',
+        probabilityBarClasses: 'bg-rose-500 dark:bg-rose-400',
         Icon: Siren,
         heading: 'Emergency risk detected'
       };
@@ -692,6 +695,9 @@ function HealthRiskPrediction({
       return {
         badgeClasses: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
         panelClasses: 'border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-yellow-50 dark:border-amber-900/60 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900',
+        accentIconClasses: 'bg-amber-500 text-white shadow-amber-500/25 dark:bg-amber-500 dark:text-white',
+        statusIconClasses: 'text-amber-500 dark:text-amber-400',
+        probabilityBarClasses: 'bg-amber-500 dark:bg-amber-400',
         Icon: ShieldAlert,
         heading: 'Warning risk detected'
       };
@@ -700,6 +706,9 @@ function HealthRiskPrediction({
     return {
       badgeClasses: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
       panelClasses: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:border-emerald-900/60 dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-900',
+      accentIconClasses: 'bg-emerald-500 text-white shadow-emerald-500/25 dark:bg-emerald-500 dark:text-white',
+      statusIconClasses: 'text-emerald-500 dark:text-emerald-400',
+      probabilityBarClasses: 'bg-emerald-500 dark:bg-emerald-400',
       Icon: CheckCircle2,
       heading: 'Normal risk detected'
     };
@@ -718,8 +727,8 @@ function HealthRiskPrediction({
     <section className={`mt-8 mb-8 rounded-3xl border p-6 shadow-sm ${presentation.panelClasses}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="rounded-2xl bg-slate-900 p-3 text-white shadow-lg dark:bg-white dark:text-slate-900">
-            <Stethoscope className="h-6 w-6" />
+          <div className={`rounded-2xl p-3 shadow-lg ${presentation.accentIconClasses}`}>
+            <Activity className="h-6 w-6" />
           </div>
           <div>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -772,7 +781,7 @@ function HealthRiskPrediction({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3">
-                    <presentation.Icon className="h-6 w-6 text-slate-900 dark:text-white" />
+                    <presentation.Icon className={`h-6 w-6 ${presentation.statusIconClasses}`} />
                     <p className="text-lg font-semibold text-slate-900 dark:text-white">{presentation.heading}</p>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{dataSourceLabel}</p>
@@ -841,7 +850,7 @@ function HealthRiskPrediction({
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
-                        className="h-full rounded-full bg-slate-900 transition-all dark:bg-white"
+                        className={`h-full rounded-full transition-all ${presentation.probabilityBarClasses}`}
                         style={{ width: `${Math.max(value * 100, 4)}%` }}
                       />
                     </div>
