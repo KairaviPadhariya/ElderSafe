@@ -285,69 +285,71 @@ function DoctorDashboard({ userName }: Props) {
         ) : (
           <div className="divide-y">
             {upcomingSchedule.map((appointment) => (
-              <div key={appointment._id} className="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-100">
-                    {getPatientInitials(appointment.patient_name)}
-                  </div>
+              <div key={appointment._id} className="p-6 flex flex-col gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-100">
+                      {getPatientInitials(appointment.patient_name)}
+                    </div>
 
-                  <div>
-                    <h4 className="font-semibold text-slate-900 dark:text-white">
-                      {appointment.patient_name || 'Patient'}
-                    </h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {(appointment.reason || 'General consultation')} | {formatAppointmentDate(appointment.date)} | {appointment.time}
-                    </p>
-                    {appointment.location && (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        {appointment.location}
+                    <div>
+                      <h4 className="font-semibold text-slate-900 dark:text-white">
+                        {appointment.patient_name || 'Patient'}
+                      </h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {(appointment.reason || 'General consultation')} | {formatAppointmentDate(appointment.date)} | {appointment.time}
                       </p>
-                    )}
-                  </div>
-                </div>
-
-                {editingId === appointment._id ? (
-                  <div className="flex flex-col sm:flex-row gap-3 lg:items-center">
-                    <input
-                      type="date"
-                      className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                      value={editDate}
-                      onChange={(event) => setEditDate(event.target.value)}
-                    />
-                    <input
-                      type="time"
-                      className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                      value={editTime}
-                      onChange={(event) => setEditTime(event.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleReschedule(appointment._id)}
-                        disabled={savingId === appointment._id}
-                        className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm disabled:opacity-70"
-                      >
-                        {savingId === appointment._id ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditDate('');
-                          setEditTime('');
-                        }}
-                        className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
-                      >
-                        Cancel
-                      </button>
+                      {appointment.location && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {appointment.location}
+                        </p>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => startReschedule(appointment)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
-                  >
-                    Reschedule
-                  </button>
-                )}
+
+                  {editingId === appointment._id ? (
+                    <div className="flex flex-col sm:flex-row gap-3 lg:items-center">
+                      <input
+                        type="date"
+                        className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                        value={editDate}
+                        onChange={(event) => setEditDate(event.target.value)}
+                      />
+                      <input
+                        type="time"
+                        className="border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                        value={editTime}
+                        onChange={(event) => setEditTime(event.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleReschedule(appointment._id)}
+                          disabled={savingId === appointment._id}
+                          className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm disabled:opacity-70"
+                        >
+                          {savingId === appointment._id ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditDate('');
+                            setEditTime('');
+                          }}
+                          className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startReschedule(appointment)}
+                      className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200"
+                    >
+                      Reschedule
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

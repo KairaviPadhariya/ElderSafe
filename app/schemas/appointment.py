@@ -13,6 +13,7 @@ class AppointmentCreate(BaseModel):
     reason: Optional[str] = None
     location: Optional[str] = None
     status: Optional[str] = "upcoming"
+    doctor_note: Optional[str] = None
 
 
 class AppointmentUpdate(BaseModel):
@@ -25,3 +26,4 @@ class AppointmentUpdate(BaseModel):
     reason: Optional[str] = None
     location: Optional[str] = None
     status: Optional[str] = None
+    doctor_note: Optional[str] = None

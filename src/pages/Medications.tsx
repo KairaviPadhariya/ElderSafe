@@ -1,29 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Pill, Clock, CalendarCheck, Plus, CheckCircle2, SkipForward, AlertTriangle } from 'lucide-react';
+import { Pill, Clock, CalendarCheck, CheckCircle2, SkipForward, AlertTriangle } from 'lucide-react';
 
 import BackButton from '../components/BackButton';
 import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 const REQUEST_TIMEOUT_MS = 12000;
-
-const DEFAULT_TIMES_BY_FREQUENCY: Record<string, string[]> = {
-  'Once daily': ['08:00'],
-  'Twice daily': ['08:00', '20:00'],
-  'Thrice daily': ['08:00', '14:00', '20:00'],
-  'Three times daily': ['08:00', '14:00', '20:00'],
-  'Four times daily': ['06:00', '12:00', '18:00', '22:00'],
-  'As needed': ['08:00'],
-};
-
-function getDefaultTimesForFrequency(frequency: string) {
-  return [...(DEFAULT_TIMES_BY_FREQUENCY[frequency] || ['08:00'])];
-}
-
-function normalizeTimesForFrequency(currentTimes: string[], frequency: string) {
-  const defaultTimes = getDefaultTimesForFrequency(frequency);
-  return defaultTimes.map((defaultTime, index) => currentTimes[index] || defaultTime);
-}
 
 type Medication = {
   _id: string;
@@ -34,6 +16,8 @@ type Medication = {
   instructions?: string | null;
   start_date: string;
   duration_days: number;
+  doctor_note?: string | null;
+  prescribed_by_name?: string | null;
   refill?: {
     days_remaining?: number | null;
     status: 'active' | 'refill_soon' | 'refill_due' | 'unknown';
@@ -92,6 +76,7 @@ async function requestJson(url: string, options: RequestInit = {}) {
 }
 
 function Medications() {
+  const role = localStorage.getItem('userRole') || 'patient';
   const [medications, setMedications] = useState<Medication[]>([]);
   const [schedule, setSchedule] = useState<Dose[]>([]);
   const [summary, setSummary] = useState<ScheduleSummary | null>(null);
@@ -99,16 +84,6 @@ function Medications() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    medicine_name: '',
-    dosage: '',
-    frequency: 'Once daily',
-    times: getDefaultTimesForFrequency('Once daily'),
-    instructions: '',
-    start_date: new Date().toISOString().slice(0, 10),
-    duration_days: '30'
-  });
 
   const token = localStorage.getItem('token');
 
@@ -144,97 +119,6 @@ function Medications() {
   useEffect(() => {
     loadMedicationData();
   }, []);
-
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-
-    if (name === 'frequency') {
-      setFormData((current) => ({
-        ...current,
-        frequency: value,
-        times: normalizeTimesForFrequency(current.times, value),
-      }));
-      return;
-    }
-
-    setFormData((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleTimeChange = (index: number, value: string) => {
-    setFormData((current) => ({
-      ...current,
-      times: current.times.map((time, timeIndex) => (timeIndex === index ? value : time)),
-    }));
-  };
-
-  const handleCreateMedication = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!token) {
-      setError('Please log in again to manage medications.');
-      return;
-    }
-
-    setSaving(true);
-    setFeedback('');
-
-    try {
-      const times = formData.times
-        .map((value) => value.trim())
-        .filter(Boolean);
-
-      const savedMedication = await requestJson(`${API_BASE_URL}/medications`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          medicine_name: formData.medicine_name,
-          dosage: formData.dosage,
-          frequency: formData.frequency,
-          times,
-          instructions: formData.instructions || null,
-          start_date: formData.start_date,
-          duration_days: Number.parseInt(formData.duration_days, 10)
-        })
-      });
-
-      await logActivitySafely({
-        action: 'medication_created',
-        activity_type: 'medication',
-        description: `Medication ${formData.medicine_name} was added to the schedule.`,
-        metadata: {
-          medication_id: savedMedication?._id || null,
-          medicine_name: formData.medicine_name,
-          dosage: formData.dosage,
-          frequency: formData.frequency,
-          times,
-          start_date: formData.start_date,
-          duration_days: Number.parseInt(formData.duration_days, 10)
-        }
-      });
-
-      setFormData({
-        medicine_name: '',
-        dosage: '',
-        frequency: 'Once daily',
-        times: getDefaultTimesForFrequency('Once daily'),
-        instructions: '',
-        start_date: new Date().toISOString().slice(0, 10),
-        duration_days: '30'
-      });
-      setShowForm(false);
-      setFeedback('Medication saved successfully.');
-      await loadMedicationData();
-      window.dispatchEvent(new CustomEvent('notifications-updated'));
-    } catch (saveError) {
-      console.error('Failed to save medication:', saveError);
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save medication.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDoseUpdate = async (dose: Dose, status: 'taken' | 'skipped' | 'missed') => {
     if (!token) {
@@ -300,16 +184,10 @@ function Medications() {
               <Pill className="w-8 h-8 text-orange-500" />
               My Medications
             </h1>
-            <p className="text-slate-500 dark:text-slate-400">Manage medicines, due times, and daily adherence</p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Review the medicines your doctor prescribed and update each dose as taken, skipped, or missed
+            </p>
           </div>
-
-          <button
-            onClick={() => setShowForm((current) => !current)}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg shadow-orange-500/20 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            {showForm ? 'Close Form' : 'Add Medication'}
-          </button>
         </div>
 
         {error && (
@@ -324,92 +202,10 @@ function Medications() {
           </div>
         )}
 
-        {showForm && (
-          <form onSubmit={handleCreateMedication} className="mb-8 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                name="medicine_name"
-                value={formData.medicine_name}
-                onChange={handleInputChange}
-                placeholder="Medicine name"
-                required
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
-              <input
-                name="dosage"
-                value={formData.dosage}
-                onChange={handleInputChange}
-                placeholder="Dosage"
-                required
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
-              <select
-                name="frequency"
-                value={formData.frequency}
-                onChange={handleInputChange}
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              >
-                <option>Once daily</option>
-                <option>Twice daily</option>
-                <option>Thrice daily</option>
-                <option>Three times daily</option>
-                <option>Four times daily</option>
-                <option>As needed</option>
-              </select>
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 px-4 py-3">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">Dose times</p>
-                <div className="space-y-3">
-                  {formData.times.map((time, index) => (
-                    <div key={`${formData.frequency}-${index}`} className="flex items-center gap-3">
-                      <label className="w-24 text-sm text-slate-500 dark:text-slate-400">
-                        Dose {index + 1}
-                      </label>
-                      <input
-                        type="time"
-                        value={time}
-                        onChange={(event) => handleTimeChange(index, event.target.value)}
-                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-4 py-2.5 dark:text-white outline-none"
-                        required
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <input
-                type="date"
-                name="start_date"
-                value={formData.start_date}
-                onChange={handleInputChange}
-                required
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
-              <input
-                type="number"
-                min="1"
-                name="duration_days"
-                value={formData.duration_days}
-                onChange={handleInputChange}
-                placeholder="Duration in days"
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
-              <textarea
-                name="instructions"
-                value={formData.instructions}
-                onChange={handleInputChange}
-                placeholder="Instructions like after food"
-                rows={3}
-                className="md:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="mt-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 transition-colors disabled:opacity-70"
-            >
-              {saving ? 'Saving...' : 'Save Medication'}
-            </button>
-          </form>
+        {role === 'patient' && (
+          <div className="mb-8 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Your doctor now manages medication plans. You can update each dose below as taken, skipped, or missed.
+          </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -536,6 +332,16 @@ function Medications() {
                     </div>
                     {medication.instructions && (
                       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{medication.instructions}</p>
+                    )}
+                    {medication.doctor_note && (
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                        Doctor note: {medication.doctor_note}
+                      </p>
+                    )}
+                    {medication.prescribed_by_name && (
+                      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                        Prescribed by Dr. {medication.prescribed_by_name}
+                      </p>
                     )}
                   </div>
                 </div>

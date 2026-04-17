@@ -253,15 +253,12 @@ function MedicalHistory() {
         setSelectedDocumentId(documentRecord.id);
 
         try {
-<<<<<<< Updated upstream
             await fetch(`${API_BASE_URL}/medical-documents/${documentRecord.id}`, {
                 ...(isDoctorView && selectedPatientId
                     ? { headers: { Authorization: `Bearer ${token}` } }
                     : { headers: { Authorization: `Bearer ${token}` } })
             });
 
-=======
->>>>>>> Stashed changes
             const previewUrl = new URL(`${API_BASE_URL}/medical-documents/${documentRecord.id}`);
             if (isDoctorView && selectedPatientId) {
                 previewUrl.searchParams.set('patient_id', selectedPatientId);

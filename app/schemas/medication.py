@@ -13,6 +13,17 @@ class MedicationCreate(BaseModel):
     duration_days: int = Field(..., ge=1)
 
 
+class DoctorMedicationCreate(BaseModel):
+    medicine_name: str
+    dosage: str
+    frequency: str
+    times: list[str] = Field(default_factory=list)
+    instructions: Optional[str] = None
+    start_date: str
+    duration_days: int = Field(..., ge=1)
+    doctor_note: Optional[str] = None
+
+
 class MedicationLogCreate(BaseModel):
     scheduled_time: str
     status: Literal["taken", "skipped", "missed"]
