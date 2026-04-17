@@ -3,6 +3,9 @@ import { Heart, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, decodeJWT } from '../utils/api';
 
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+
 function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -44,7 +47,7 @@ const handleLogin = async (e: React.FormEvent) => {
       }
 
       try {
-        const userResponse = await fetch("http://34.233.187.127:8000/users/me", {
+        const userResponse = await fetch(`${API_BASE_URL}/users/me`, {
           headers: {
             Authorization: `Bearer ${data.access_token}`
           }

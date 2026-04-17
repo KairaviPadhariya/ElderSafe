@@ -3,7 +3,8 @@ import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Siren, Stethoscope }
 
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 const AUTO_SOS_THRESHOLD = 3;
 
@@ -189,6 +190,19 @@ function getCurrentDateKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function buildLogEventKey(log: DailyHealthLog | undefined) {
+  if (!log?.log_date) {
+    return '';
+  }
+
+  const timestamp =
+    getLogTimestamp(log)?.toISOString()
+    || parseTimestamp(`${log.log_date}T00:00:00`)?.toISOString()
+    || '';
+
+  return `${log.log_date}:${timestamp}`;
+}
+
 function getCurrentLocationLabel(): Promise<string> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
@@ -235,6 +249,33 @@ function writeRiskHistory(patientId: string | undefined, nextHistory: RiskHistor
   localStorage.setItem(getRiskHistoryKey(patientId), JSON.stringify(nextHistory));
   localStorage.setItem(getRiskHistoryKey(undefined), JSON.stringify(nextHistory));
   window.dispatchEvent(new CustomEvent('ml-history-updated'));
+}
+
+async function saveRiskHistoryEntry(
+  patientId: string,
+  entry: RiskHistoryEntry,
+  logDate: string
+) {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return;
+  }
+
+  await requestJson(`${API_BASE_URL}/health_trends`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      patient_id: patientId,
+      prediction: entry.prediction,
+      confidence: entry.confidence,
+      date: entry.date,
+      log_date: logDate || entry.date.slice(0, 10)
+    })
+  });
 }
 
 function buildPredictionReasons(result: PredictionResult | null, payload: PredictionPayloadSnapshot | null) {
@@ -376,6 +417,8 @@ function HealthRiskPrediction({
   const [autoSosMessage, setAutoSosMessage] = useState('');
   const [payloadSnapshot, setPayloadSnapshot] = useState<PredictionPayloadSnapshot | null>(null);
   const [missingDataWarnings, setMissingDataWarnings] = useState<string[]>([]);
+  const [latestLogEventKey, setLatestLogEventKey] = useState('');
+  const [latestLogDate, setLatestLogDate] = useState('');
 
   const loadPrediction = async (isRefresh = false) => {
     const token = localStorage.getItem('token');
@@ -494,6 +537,8 @@ function HealthRiskPrediction({
       setResult(prediction as PredictionResult);
       setPayloadSnapshot(normalizedPayload);
       setResolvedPatientId(normalizedPayload.patient_id ?? targetPatientId ?? undefined);
+      setLatestLogEventKey(buildLogEventKey(latestLog));
+      setLatestLogDate(latestLog?.log_date || '');
       setDataSourceLabel(
         latestLog?.log_date
           ? `Using the latest daily log from ${latestLog.log_date}.`
@@ -505,6 +550,8 @@ function HealthRiskPrediction({
       setResult(null);
       setPayloadSnapshot(null);
       setResolvedPatientId(targetPatientId ?? undefined);
+      setLatestLogEventKey('');
+      setLatestLogDate('');
       setDataSourceLabel('');
       setError(loadError instanceof Error ? loadError.message : 'Unable to load the prediction right now.');
     } finally {
@@ -540,7 +587,13 @@ function HealthRiskPrediction({
       : [...existingHistory, historyEntry].slice(-6);
 
     writeRiskHistory(resolvedPatientId, nextHistory);
-  }, [resolvedPatientId, result]);
+
+    if (resolvedPatientId) {
+      saveRiskHistoryEntry(resolvedPatientId, historyEntry, latestLogDate).catch((saveError) => {
+        console.error('Failed to save prediction history:', saveError);
+      });
+    }
+  }, [latestLogDate, resolvedPatientId, result]);
 
   useEffect(() => {
     if (!allowAutoSos) {
@@ -555,14 +608,28 @@ function HealthRiskPrediction({
 
       const streakKey = getPatientStorageKey(resolvedPatientId, 'emergency-streak');
       const triggerKey = getPatientStorageKey(resolvedPatientId, 'last-auto-sos');
+      const processedLogKey = getPatientStorageKey(resolvedPatientId, 'last-sos-counted-log');
+      const todayKey = getCurrentDateKey();
+
+      if (!latestLogDate || latestLogDate !== todayKey || !latestLogEventKey) {
+        setAutoSosMessage('SOS monitoring counts only after today\'s daily health log is added.');
+        return;
+      }
+
+      if (localStorage.getItem(processedLogKey) === latestLogEventKey) {
+        setAutoSosMessage('SOS monitoring is already up to date for today\'s latest health log.');
+        return;
+      }
 
       if (result.prediction !== 'emergency') {
+        localStorage.setItem(processedLogKey, latestLogEventKey);
         localStorage.setItem(streakKey, '0');
         setAutoSosMessage('');
         return;
       }
 
       const nextStreak = Number(localStorage.getItem(streakKey) || '0') + 1;
+      localStorage.setItem(processedLogKey, latestLogEventKey);
       localStorage.setItem(streakKey, String(nextStreak));
 
       if (nextStreak < AUTO_SOS_THRESHOLD) {
@@ -571,7 +638,6 @@ function HealthRiskPrediction({
       }
 
       const lastTriggerDate = localStorage.getItem(triggerKey);
-      const todayKey = getCurrentDateKey();
 
       if (lastTriggerDate === todayKey) {
         setAutoSosMessage('Automatic SOS was already sent today after repeated emergency predictions.');
@@ -608,7 +674,7 @@ function HealthRiskPrediction({
     };
 
     processEmergencyStreak();
-  }, [allowAutoSos, resolvedPatientId, result]);
+  }, [allowAutoSos, latestLogDate, latestLogEventKey, resolvedPatientId, result]);
 
   const presentation = useMemo(() => {
     const status = result?.prediction ?? 'normal';

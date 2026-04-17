@@ -4,6 +4,7 @@ from typing import Optional
 class PatientCreate(BaseModel):
     name: str
     age: int
+    dob: Optional[str] = None
     gender: str
     height: float
     weight: float

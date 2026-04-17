@@ -417,7 +417,7 @@ function PatientDashboard({ userName }: Props) {
 
   const healthEntryStats = `Last entry: ${lastHealthEntry}`;
   const healthTrendStats = riskHistory.length > 0
-    ? `Recent risk: ${riskHistory.slice(-3).map((entry) => formatRiskLabel(entry.prediction)).join(' -> ')}`
+    ? `Recent risk: ${formatRiskLabel(riskHistory[riskHistory.length - 1].prediction)}`
     : 'No risk history yet';
 
   const featureCards = [
@@ -545,28 +545,6 @@ function PatientDashboard({ userName }: Props) {
                   <Activity className="w-4 h-4 mr-2" />
                   {card.stats}
                 </div>
-
-                {card.id === 'health-tracker' && riskHistory.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {riskHistory.slice(-4).map((entry) => {
-                      const timelineClasses =
-                        entry.prediction === 'emergency'
-                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
-                          : entry.prediction === 'warning'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-
-                      return (
-                        <span
-                          key={`${entry.date}-${entry.prediction}`}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${timelineClasses}`}
-                        >
-                          {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} {formatRiskLabel(entry.prediction)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
               </div>
             </button>
           );

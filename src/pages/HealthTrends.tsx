@@ -5,7 +5,8 @@ import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogResponse = {
@@ -103,22 +104,21 @@ function calculateTrend(values: number[]) {
   return delta > 0 ? `Up ${delta.toFixed(1)}` : `Down ${Math.abs(delta).toFixed(1)}`;
 }
 
-function readRiskHistory() {
-  try {
-    const raw = localStorage.getItem('eldersafe-risk-history-current-patient');
-    if (!raw) {
-      return [] as RiskHistoryEntry[];
-    }
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed as RiskHistoryEntry[] : [];
-  } catch {
-    return [];
-  }
-}
-
 function formatRiskLabel(prediction: RiskHistoryEntry['prediction']) {
   return prediction.charAt(0).toUpperCase() + prediction.slice(1);
+}
+
+function getLocalDateKey(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value.slice(0, 10);
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function MultiLineChartCard({
@@ -301,9 +301,11 @@ function HealthTrends() {
   const [error, setError] = useState('');
   const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'risk'>('weekly');
   const [riskHistory, setRiskHistory] = useState<RiskHistoryEntry[]>([]);
+  const [linkedPatientId, setLinkedPatientId] = useState('');
 
   const loadLogs = useCallback(async () => {
     const token = localStorage.getItem('token');
+    let familyPatientId = '';
 
     if (!token) {
       setError('Please log in again to view health trends.');
@@ -318,15 +320,23 @@ function HealthTrends() {
             Authorization: `Bearer ${token}`,
           },
         });
-        setLinkedPatientName((familyData as FamilyRecord | null)?.patient_name || '');
+        const familyRecord = (familyData as FamilyRecord | null) ?? null;
+        setLinkedPatientName(familyRecord?.patient_name || '');
+        setLinkedPatientId(familyRecord?.patient_id || '');
+        familyPatientId = familyRecord?.patient_id || '';
       } else if (isDoctorView) {
         setLinkedPatientName(selectedPatientName);
+        setLinkedPatientId('');
+      } else {
+        setLinkedPatientId('');
       }
 
       const url = new URL(`${API_BASE_URL}/daily_health_logs`);
 
       if (isDoctorView && selectedPatientId) {
         url.searchParams.set('patient_id', selectedPatientId);
+      } else if (isFamilyView && (familyPatientId || linkedPatientId)) {
+        url.searchParams.set('patient_id', familyPatientId || linkedPatientId);
       }
 
       const logs = await requestJson(url.toString(), {
@@ -338,6 +348,23 @@ function HealthTrends() {
       const normalizedLogs = Array.isArray(logs) ? (logs as DailyLogResponse[]) : [];
       normalizedLogs.sort((left, right) => left.log_date.localeCompare(right.log_date));
       setEntries(normalizedLogs);
+
+      const trendsUrl = new URL(`${API_BASE_URL}/health_trends`);
+      if (isDoctorView && selectedPatientId) {
+        trendsUrl.searchParams.set('patient_id', selectedPatientId);
+      } else if (isFamilyView && (familyPatientId || linkedPatientId)) {
+        trendsUrl.searchParams.set('patient_id', familyPatientId || linkedPatientId);
+      }
+
+      const trends = await requestJson(trendsUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const normalizedTrends = Array.isArray(trends) ? (trends as RiskHistoryEntry[]) : [];
+      normalizedTrends.sort((left, right) => left.date.localeCompare(right.date));
+      setRiskHistory(normalizedTrends);
       setError('');
     } catch (loadError) {
       console.error('Failed to load health trends:', loadError);
@@ -345,24 +372,38 @@ function HealthTrends() {
     } finally {
       setLoading(false);
     }
-  }, [isDoctorView, isFamilyView, selectedPatientId, selectedPatientName]);
+  }, [isDoctorView, isFamilyView, linkedPatientId, selectedPatientId, selectedPatientName]);
 
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
 
   useEffect(() => {
-    const syncRiskHistory = () => {
-      setRiskHistory(readRiskHistory());
+    const refreshRiskHistory = () => {
+      void loadLogs();
     };
 
-    syncRiskHistory();
-    window.addEventListener('ml-history-updated', syncRiskHistory as EventListener);
+    window.addEventListener('ml-history-updated', refreshRiskHistory as EventListener);
 
     return () => {
-      window.removeEventListener('ml-history-updated', syncRiskHistory as EventListener);
+      window.removeEventListener('ml-history-updated', refreshRiskHistory as EventListener);
     };
-  }, []);
+  }, [loadLogs]);
+
+  const dailyRiskHistory = useMemo(() => {
+    const latestRiskByDay = new Map<string, RiskHistoryEntry>();
+
+    for (let index = riskHistory.length - 1; index >= 0; index -= 1) {
+      const entry = riskHistory[index];
+      const dateKey = getLocalDateKey(entry.date);
+
+      if (!latestRiskByDay.has(dateKey)) {
+        latestRiskByDay.set(dateKey, entry);
+      }
+    }
+
+    return Array.from(latestRiskByDay.values()).reverse();
+  }, [riskHistory]);
 
   const filteredEntries = useMemo(() => {
     if (entries.length === 0) return [];
@@ -541,18 +582,18 @@ function HealthTrends() {
                   Risk Timeline
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Recent ML prediction results tracked alongside your health trends.
+                  Recent prediction results tracked alongside your health trends.
                 </p>
               </div>
             </div>
 
-            {riskHistory.length === 0 ? (
+            {dailyRiskHistory.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No risk history yet. Refresh the dashboard prediction card to start building a timeline.
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {riskHistory.map((entry) => {
+                {dailyRiskHistory.map((entry) => {
                   const timelineClasses =
                     entry.prediction === 'emergency'
                       ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'

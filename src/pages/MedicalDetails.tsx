@@ -4,13 +4,15 @@ import { Activity, Clipboard, FileText, Lock, Save, Scale, Thermometer, Trending
 import BackButton from '../components/BackButton';
 import { resolveLinkedPatient } from '../utils/patientData';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 type PatientRecord = {
     _id: string;
     user_id?: string;
     name?: string;
     age?: number;
+    dob?: string | null;
     gender?: string;
     height?: number;
     weight?: number;
@@ -47,6 +49,7 @@ type DailyLogRecord = {
 
 type FormData = {
     age: string;
+    dob: string;
     gender: string;
     height: string;
     weight: string;
@@ -66,6 +69,7 @@ type FormData = {
 
 const initialFormData: FormData = {
     age: '',
+    dob: '',
     gender: '',
     height: '',
     weight: '',
@@ -82,6 +86,25 @@ const initialFormData: FormData = {
     ppbs: '',
     cholesterol: ''
 };
+
+const editableMedicalFieldLabels: Array<{ key: keyof FormData; label: string }> = [
+    { key: 'age', label: 'Age' },
+    { key: 'dob', label: 'Date of Birth' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'height', label: 'Height' },
+    { key: 'weight', label: 'Weight' },
+    { key: 'bloodGroup', label: 'Blood Group' },
+    { key: 'o2Saturation', label: 'O2 Saturation' },
+    { key: 'heartRate', label: 'Heart Rate' },
+    { key: 'sbp', label: 'SBP' },
+    { key: 'dbp', label: 'DBP' },
+    { key: 'hasBp', label: 'Blood Pressure' },
+    { key: 'hasDiabetes', label: 'Diabetes' },
+    { key: 'hasCardiacHistory', label: 'Cardiac History' },
+    { key: 'fbs', label: 'Fasting Blood Sugar' },
+    { key: 'ppbs', label: 'Post-Prandial Sugar' },
+    { key: 'cholesterol', label: 'Cholesterol' }
+];
 
 function toDisplayValue(value?: string | number | null) {
     if (value === undefined || value === null || value === '') {
@@ -126,6 +149,7 @@ function mapPatientToFormData(patient: PatientRecord | null): FormData {
 
     return {
         age: patient.age !== undefined ? String(patient.age) : '',
+        dob: patient.dob || '',
         gender: patient.gender || '',
         height: patient.height !== undefined ? String(patient.height) : '',
         weight: patient.weight !== undefined ? String(patient.weight) : '',
@@ -142,6 +166,33 @@ function mapPatientToFormData(patient: PatientRecord | null): FormData {
         ppbs: patient.ppbs !== undefined && patient.ppbs !== null ? String(patient.ppbs) : '',
         cholesterol: patient.cholesterol !== undefined && patient.cholesterol !== null ? String(patient.cholesterol) : ''
     };
+}
+
+function getMissingMedicalFieldLabels(formData: FormData) {
+    return editableMedicalFieldLabels
+        .filter(({ key }) => !formData[key])
+        .map(({ label }) => label);
+}
+
+function calculateAgeFromDob(dob: string) {
+    if (!dob) {
+        return '';
+    }
+
+    const birthDate = new Date(`${dob}T00:00:00`);
+    if (Number.isNaN(birthDate.getTime())) {
+        return '';
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+        age -= 1;
+    }
+
+    return age >= 0 ? String(age) : '';
 }
 
 function ReadOnlyTableSection({
@@ -221,6 +272,14 @@ function MedicalDetails() {
     const [error, setError] = useState('');
     const [linkedPatientName, setLinkedPatientName] = useState('');
     const [formData, setFormData] = useState<FormData>(initialFormData);
+    const [isEditingDetails, setIsEditingDetails] = useState(false);
+    const [lockedFields, setLockedFields] = useState<Partial<Record<keyof FormData, boolean>>>({});
+    const isFieldLocked = (field: keyof FormData) => (
+        hasSavedProfile
+        && isEditingDetails
+        && field !== 'weight'
+        && Boolean(lockedFields[field])
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -244,6 +303,17 @@ function MedicalDetails() {
             setFormData((prev) => ({ ...prev, bmi: '' }));
         }
     }, [formData.height, formData.weight, isFamilyView]);
+
+    useEffect(() => {
+        if (isFamilyView) {
+            return;
+        }
+
+        const calculatedAge = calculateAgeFromDob(formData.dob);
+        if (calculatedAge !== formData.age) {
+            setFormData((prev) => ({ ...prev, age: calculatedAge }));
+        }
+    }, [formData.age, formData.dob, isFamilyView]);
 
     useEffect(() => {
         if (isFamilyView) {
@@ -281,11 +351,15 @@ function MedicalDetails() {
                 setError('');
                 setHasSavedProfile(Boolean(patientData));
                 setFormData(mapPatientToFormData(patientData));
+                setLockedFields({});
+                setIsEditingDetails(false);
             } catch (loadError) {
                 console.error('Failed to load patient medical details:', loadError);
                 setError(loadError instanceof Error ? loadError.message : 'Unable to load medical details.');
                 setHasSavedProfile(false);
                 setFormData({ ...initialFormData, sbp: '', dbp: '' });
+                setLockedFields({});
+                setIsEditingDetails(false);
             } finally {
                 setPatientLoading(false);
             }
@@ -456,6 +530,7 @@ function MedicalDetails() {
                 body: JSON.stringify({
                     name,
                     age: Number(formData.age),
+                    dob: formData.dob || null,
                     gender: formData.gender,
                     height: Number(formData.height),
                     weight: Number(formData.weight),
@@ -482,6 +557,8 @@ function MedicalDetails() {
             }
 
             setHasSavedProfile(true);
+            setLockedFields({});
+            setIsEditingDetails(false);
             setLoading(false);
             navigate('/dashboard');
         } catch (submitError) {
@@ -492,13 +569,19 @@ function MedicalDetails() {
     };
 
     const pageTitle = isFamilyView ? 'Patient Overview' : hasSavedProfile ? 'Saved Medical Profile' : 'Medical Profile';
+    const missingMedicalFields = getMissingMedicalFieldLabels(formData);
+    const hasIncompleteSavedProfile = !isFamilyView && hasSavedProfile && missingMedicalFields.length > 0;
+    const showEditableForm = !isFamilyView && (!hasSavedProfile || isEditingDetails);
     const pageDescription = isFamilyView
         ? `Viewing ${linkedPatientName || 'the linked patient'}'s medical details in read-only mode.`
         : hasSavedProfile
-            ? 'Your medical details are already saved and only need to be provided once.'
+            ? hasIncompleteSavedProfile
+                ? 'Some medical details are still missing. Use Edit Details to complete the remaining fields.'
+                : 'Your medical details are already saved and only need to be provided once.'
             : 'Please provide your medical details to help us personalize your health monitoring.';
     const personalRows = [
         { label: 'Age', value: toDisplayValue(formData.age) },
+        { label: 'Date of Birth', value: toDisplayValue(formData.dob) },
         { label: 'Gender', value: formatGender(formData.gender) },
         { label: 'Blood Group', value: toDisplayValue(formData.bloodGroup) },
         { label: 'Height (cm)', value: toDisplayValue(formData.height) },
@@ -552,6 +635,30 @@ function MedicalDetails() {
                             </div>
                         )}
 
+                        {hasIncompleteSavedProfile && !isEditingDetails ? (
+                            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                                <p>
+                                    Missing medical details: {missingMedicalFields.join(', ')}.
+                                </p>
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setLockedFields(
+                                                Object.fromEntries(
+                                                    Object.entries(formData).map(([key, value]) => [key, Boolean(value)])
+                                                ) as Partial<Record<keyof FormData, boolean>>
+                                            );
+                                            setIsEditingDetails(true);
+                                        }}
+                                        className="rounded-xl bg-amber-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-amber-700"
+                                    >
+                                        Edit Details
+                                    </button>
+                                </div>
+                            </div>
+                        ) : null}
+
                         {isFamilyView && !familyLoading && (
                             <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <FamilyQuickCard
@@ -587,7 +694,7 @@ function MedicalDetails() {
                             </div>
                         ) : isFamilyView && !showFamilyPatientInfo ? null : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {isFamilyView || hasSavedProfile ? (
+                                {isFamilyView || (hasSavedProfile && !isEditingDetails) ? (
                                     <>
                                         <ReadOnlyTableSection
                                             title="Personal Information"
@@ -615,11 +722,15 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Age</label>
-                                            <input type="number" name="age" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="Years" value={formData.age} onChange={handleChange} />
+                                            <input type="number" name="age" readOnly className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 transition-all outline-none cursor-not-allowed" placeholder="Auto-calculated from DOB" value={formData.age} onChange={handleChange} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Date of Birth</label>
+                                            <input type="date" name="dob" required={!isFieldLocked('dob')} disabled={isFieldLocked('dob')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.dob} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Gender</label>
-                                            <select name="gender" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.gender} onChange={handleChange}>
+                                            <select name="gender" required={!isFieldLocked('gender')} disabled={isFieldLocked('gender')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.gender} onChange={handleChange}>
                                                 <option value="">Select Gender</option>
                                                 <option value="male">Male</option>
                                                 <option value="female">Female</option>
@@ -628,7 +739,7 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Blood Group</label>
-                                            <select name="bloodGroup" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.bloodGroup} onChange={handleChange}>
+                                            <select name="bloodGroup" required={!isFieldLocked('bloodGroup')} disabled={isFieldLocked('bloodGroup')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.bloodGroup} onChange={handleChange}>
                                                 <option value="">Select Group</option>
                                                 <option value="A+">A+</option>
                                                 <option value="A-">A-</option>
@@ -643,7 +754,7 @@ function MedicalDetails() {
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Height (cm)</label>
                                             <div className="relative">
-                                                <input type="number" name="height" step="0.1" required className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none pl-11" placeholder="175" value={formData.height} onChange={handleChange} />
+                                                <input type="number" name="height" step="0.1" required={!isFieldLocked('height')} disabled={isFieldLocked('height')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none pl-11 disabled:cursor-not-allowed" placeholder="175" value={formData.height} onChange={handleChange} />
                                                 <Scale className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
                                             </div>
                                         </div>
@@ -663,24 +774,24 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">O2 Saturation (%)</label>
-                                            <input type="number" name="o2Saturation" min="0" max="100" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="98" value={formData.o2Saturation} onChange={handleChange} />
+                                            <input type="number" name="o2Saturation" min="0" max="100" disabled={isFieldLocked('o2Saturation')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="98" value={formData.o2Saturation} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Heart Rate (bpm)</label>
-                                            <input type="number" name="heartRate" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="72" value={formData.heartRate} onChange={handleChange} />
+                                            <input type="number" name="heartRate" min="0" disabled={isFieldLocked('heartRate')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="72" value={formData.heartRate} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">SBP (mmHg)</label>
-                                            <input type="number" name="sbp" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="120" value={formData.sbp} onChange={handleChange} />
+                                            <input type="number" name="sbp" min="0" disabled={isFieldLocked('sbp')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="120" value={formData.sbp} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">DBP (mmHg)</label>
-                                            <input type="number" name="dbp" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="80" value={formData.dbp} onChange={handleChange} />
+                                            <input type="number" name="dbp" min="0" disabled={isFieldLocked('dbp')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="80" value={formData.dbp} onChange={handleChange} />
                                         </div>
                                     </>
                                 )}
 
-                                {!isFamilyView && !hasSavedProfile && (
+                                {showEditableForm && (
                                     <>
                                         <div className="lg:col-span-3 pb-2 border-b border-slate-100 dark:border-slate-700 mb-2 mt-4">
                                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
@@ -690,7 +801,7 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Blood Pressure</label>
-                                            <select name="hasBp" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasBp} onChange={handleChange}>
+                                            <select name="hasBp" required={!hasSavedProfile && !isFieldLocked('hasBp')} disabled={isFieldLocked('hasBp')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.hasBp} onChange={handleChange}>
                                                 <option value="">Select answer</option>
                                                 <option value="yes">Yes</option>
                                                 <option value="no">No</option>
@@ -698,7 +809,7 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diabetes</label>
-                                            <select name="hasDiabetes" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasDiabetes} onChange={handleChange}>
+                                            <select name="hasDiabetes" required={!hasSavedProfile && !isFieldLocked('hasDiabetes')} disabled={isFieldLocked('hasDiabetes')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.hasDiabetes} onChange={handleChange}>
                                                 <option value="">Select answer</option>
                                                 <option value="yes">Yes</option>
                                                 <option value="no">No</option>
@@ -706,7 +817,7 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cardiac History</label>
-                                            <select name="hasCardiacHistory" required={!hasSavedProfile} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" value={formData.hasCardiacHistory} onChange={handleChange}>
+                                            <select name="hasCardiacHistory" required={!hasSavedProfile && !isFieldLocked('hasCardiacHistory')} disabled={isFieldLocked('hasCardiacHistory')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" value={formData.hasCardiacHistory} onChange={handleChange}>
                                                 <option value="">Select answer</option>
                                                 <option value="yes">Yes</option>
                                                 <option value="no">No</option>
@@ -714,15 +825,15 @@ function MedicalDetails() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fasting Blood Sugar</label>
-                                            <input type="number" name="fbs" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="Before meal (mg/dL)" value={formData.fbs} onChange={handleChange} />
+                                            <input type="number" name="fbs" disabled={isFieldLocked('fbs')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="Before meal (mg/dL)" value={formData.fbs} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Post-Prandial Sugar</label>
-                                            <input type="number" name="ppbs" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="2hr after meal (mg/dL)" value={formData.ppbs} onChange={handleChange} />
+                                            <input type="number" name="ppbs" disabled={isFieldLocked('ppbs')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="2hr after meal (mg/dL)" value={formData.ppbs} onChange={handleChange} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cholesterol</label>
-                                            <input type="number" name="cholesterol" className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none" placeholder="Total (mg/dL)" value={formData.cholesterol} onChange={handleChange} />
+                                            <input type="number" name="cholesterol" disabled={isFieldLocked('cholesterol')} className="w-full px-4 py-3 rounded-xl bg-slate-50 disabled:bg-slate-100 dark:bg-slate-900/50 dark:disabled:bg-slate-800/70 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:text-slate-500 dark:text-white dark:disabled:text-slate-400 transition-all outline-none disabled:cursor-not-allowed" placeholder="Total (mg/dL)" value={formData.cholesterol} onChange={handleChange} />
                                         </div>
                                     </>
                                 )}
@@ -731,19 +842,31 @@ function MedicalDetails() {
                         )}
 
                         <div className="mt-12 flex items-center justify-end gap-4">
-                            {!isFamilyView && !hasSavedProfile && (
-                                <button type="button" onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" disabled={loading}>
-                                    Skip for now
+                            {showEditableForm && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (hasSavedProfile) {
+                                            setIsEditingDetails(false);
+                                            return;
+                                        }
+
+                                        navigate('/dashboard');
+                                    }}
+                                    className="px-6 py-3 rounded-xl text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                                    disabled={loading}
+                                >
+                                    {hasSavedProfile ? 'Cancel' : 'Skip for now'}
                                 </button>
                             )}
-                            {!isFamilyView && !hasSavedProfile && (
+                            {showEditableForm && (
                                 <button type="submit" disabled={loading} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed">
                                     {loading ? (
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
                                         <>
                                             <Save className="w-5 h-5" />
-                                            Save Medical Details
+                                            {hasSavedProfile ? 'Update Medical Details' : 'Save Medical Details'}
                                         </>
                                     )}
                                 </button>

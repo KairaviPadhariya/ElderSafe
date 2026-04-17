@@ -210,7 +210,7 @@ function LandingPage() {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Phone</h4>
-                                        <p className="text-slate-600">+91 (98765) 43210</p>
+                                        <p className="text-slate-600">+91 98765 43210</p>
                                     </div>
                                 </div>
 

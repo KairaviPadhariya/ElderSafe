@@ -30,6 +30,7 @@ type ProfileData = {
 type PatientRecord = {
   name?: string;
   age?: number;
+  dob?: string | null;
   gender?: string;
   height?: number;
   weight?: number;
@@ -60,7 +61,8 @@ type FamilyRecord = {
   address?: string | null;
 };
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 function createFallbackProfile(
   role: string,
@@ -163,7 +165,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     onClose();
-    navigate('/login');
+    navigate('/');
   };
 
   const initialProfile = useMemo<ProfileData>(() => {
@@ -410,6 +412,7 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           body: JSON.stringify({
             name: editFormData.name,
             age: patientRecord.age,
+            dob: patientRecord.dob ?? null,
             gender: patientRecord.gender || 'other',
             height: patientRecord.height,
             weight: patientRecord.weight,

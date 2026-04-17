@@ -123,7 +123,7 @@ function Register() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:text-white transition-all outline-none"
-                                    placeholder="Hima Mehta"
+                                    placeholder="Full Name"
                                     required
                                 />
                             </div>
