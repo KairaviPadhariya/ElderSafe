@@ -11,6 +11,7 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    restart: always
 
   frontend:
     container_name: eldersafe-frontend
@@ -19,5 +20,4 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "5173:5173"
-
-restart: always
+    restart: always
