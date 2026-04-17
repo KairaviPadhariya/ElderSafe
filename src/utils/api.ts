@@ -1,5 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const API_BASE_URL = "http://34.233.187.127:8000";
 
 interface LoginData {
   email: string;
@@ -25,7 +24,7 @@ export { decodeJWT };
 export const api = {
   async login(data: LoginData) {
     const formData = new URLSearchParams();
-    formData.append('username', data.email.trim());  // OAuth2 uses 'username' for email
+    formData.append('username', data.email.trim());
     formData.append('password', data.password);
 
     const response = await fetch(`${API_BASE_URL}/login`, {
@@ -47,7 +46,6 @@ export const api = {
   },
 
   async register(data: RegisterData) {
-    console.log('Sending register data:', data);
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
       headers: {
@@ -55,13 +53,14 @@ export const api = {
       },
       body: JSON.stringify(data),
     });
-    console.log('Response status:', response.status);
+
     const responseText = await response.text();
-    console.log('Response text:', responseText);
+
     if (!response.ok) {
       throw new Error(`Registration failed: ${responseText}`);
     }
-    return JSON.parse(responseText);
+
+    return responseText ? JSON.parse(responseText) : null;
   },
 
   async getHealth() {
@@ -70,20 +69,20 @@ export const api = {
   },
 
   async getCurrentUser() {
-  const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token');
 
-  const response = await fetch(`${API_BASE_URL}/users`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch user');
+    if (!response.ok) {
+      throw new Error('Failed to fetch user');
+    }
+
+    return response.json();
   }
-
-  return response.json();
-}
 };
