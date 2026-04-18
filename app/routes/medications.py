@@ -4,7 +4,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import database
-from app.schemas.medication import MedicationCreate, MedicationLogCreate
+from app.schemas.medication import DoctorMedicationCreate, MedicationCreate, MedicationLogCreate
 from app.utils.auth import verify_token
 
 router = APIRouter()
@@ -39,6 +39,33 @@ async def find_patient_profile_by_name(patient_name: str | None):
         return None
 
     return await database.patients.find_one({"name": patient_name})
+
+
+async def find_patient_profile_by_reference(patient_reference: str | None, patient_name: str | None = None):
+    patient_profile = None
+
+    if patient_reference and ObjectId.is_valid(str(patient_reference)):
+        patient_profile = await database.patients.find_one({"_id": ObjectId(str(patient_reference))})
+
+    if not patient_profile and patient_reference:
+        patient_profile = await database.patients.find_one({"user_id": str(patient_reference)})
+
+    if not patient_profile and patient_name:
+        patient_profile = await find_patient_profile_by_name(patient_name)
+
+    return patient_profile
+
+
+async def resolve_doctor_profile(current_user: dict):
+    doctor_profile = await database.doctors.find_one({"user_id": current_user["sub"]})
+
+    if not doctor_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Complete the doctor profile first to prescribe medications."
+        )
+
+    return doctor_profile
 
 
 async def resolve_patient_profile(current_user: dict):
@@ -159,14 +186,14 @@ def format_time_label(time_value: str) -> str:
 
 async def build_daily_schedule(patient_id: str, target_date: str):
     medications = []
-    async for medication in database.medications.find({"patient_id": patient_id}).sort("created_at", -1):
+    async for medication in database.medications_doctor.find({"patient_id": patient_id}).sort("created_at", -1):
         medications.append(medication)
 
     medication_ids = [record["_id"] for record in medications]
     logs_by_key = {}
 
     if medication_ids:
-        async for log in database.medication_logs.find({
+        async for log in database.medications_patient.find({
             "patient_id": patient_id,
             "log_date": target_date,
             "medication_id": {"$in": medication_ids}
@@ -223,19 +250,64 @@ async def create_medication(
     medication: MedicationCreate,
     current_user: dict = Depends(verify_token)
 ):
-    if current_user.get("role") not in {"patient", "family"}:
+    if current_user.get("role") != "doctor":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only patients and family members can manage medications."
+            detail="Only doctors can prescribe medications."
         )
 
-    patient_profile = await resolve_patient_profile(current_user)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Doctors should prescribe medications from an appointment."
+    )
+
+
+@router.post("/appointments/{appointment_id}/medications")
+async def create_medication_from_appointment(
+    appointment_id: str,
+    medication: DoctorMedicationCreate,
+    current_user: dict = Depends(verify_token)
+):
+    if current_user.get("role") != "doctor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only doctors can prescribe medications."
+        )
+
+    if not ObjectId.is_valid(appointment_id):
+        raise HTTPException(status_code=400, detail="Invalid appointment ID.")
+
+    doctor_profile = await resolve_doctor_profile(current_user)
+    appointment = await database.appointments.find_one({
+        "_id": ObjectId(appointment_id),
+        "doctor_id": str(doctor_profile["_id"])
+    })
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found.")
+
+    patient_profile = await find_patient_profile_by_reference(
+        appointment.get("patient_id"),
+        appointment.get("patient_name")
+    )
+
+    if not patient_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient record linked to this appointment was not found."
+        )
+
     now = datetime.utcnow()
     medication_dict = medication.dict(exclude_none=True)
     medication_dict["patient_id"] = str(patient_profile["_id"])
     medication_dict["created_by"] = current_user["sub"]
     medication_dict["created_at"] = now
     medication_dict["updated_at"] = now
+    medication_dict["appointment_id"] = appointment_id
+    medication_dict["prescribed_by_doctor_id"] = str(doctor_profile["_id"])
+    medication_dict["prescribed_by_user_id"] = current_user["sub"]
+    medication_dict["prescribed_by_name"] = doctor_profile.get("name") or "Doctor"
+    medication_dict["doctor_note"] = (medication.doctor_note or "").strip() or None
     medication_dict["end_date"] = calculate_end_date(
         medication.start_date,
         medication.duration_days
@@ -244,8 +316,8 @@ async def create_medication(
     if not medication_dict.get("times"):
         medication_dict["times"] = get_default_times(medication.frequency)
 
-    result = await database.medications.insert_one(medication_dict)
-    saved_medication = await database.medications.find_one({"_id": result.inserted_id})
+    result = await database.medications_doctor.insert_one(medication_dict)
+    saved_medication = await database.medications_doctor.find_one({"_id": result.inserted_id})
 
     if not saved_medication:
         raise HTTPException(status_code=500, detail="Saved medication could not be loaded.")
@@ -258,7 +330,7 @@ async def get_medications(current_user: dict = Depends(verify_token)):
     patient_profile = await resolve_patient_profile(current_user)
     medications = []
 
-    async for medication in database.medications.find({"patient_id": str(patient_profile["_id"])}).sort("created_at", -1):
+    async for medication in database.medications_doctor.find({"patient_id": str(patient_profile["_id"])}).sort("created_at", -1):
         medications.append(serialize_medication(medication))
 
     return medications
@@ -292,7 +364,7 @@ async def log_medication_dose(
     if not ObjectId.is_valid(medication_id):
         raise HTTPException(status_code=400, detail="Invalid medication ID.")
 
-    medication = await database.medications.find_one({
+    medication = await database.medications_doctor.find_one({
         "_id": ObjectId(medication_id),
         "patient_id": str(patient_profile["_id"])
     })
@@ -313,7 +385,7 @@ async def log_medication_dose(
         "updated_by": current_user["sub"]
     }
 
-    await database.medication_logs.update_one(
+    await database.medications_patient.update_one(
         {
             "patient_id": str(patient_profile["_id"]),
             "medication_id": ObjectId(medication_id),
@@ -329,7 +401,7 @@ async def log_medication_dose(
         upsert=True
     )
 
-    saved_log = await database.medication_logs.find_one({
+    saved_log = await database.medications_patient.find_one({
         "patient_id": str(patient_profile["_id"]),
         "medication_id": ObjectId(medication_id),
         "scheduled_time": payload.scheduled_time,

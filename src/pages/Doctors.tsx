@@ -2,8 +2,10 @@
 import { Stethoscope, Mail, Send, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 type Doctor = {
     _id?: string;
@@ -109,6 +111,20 @@ function Doctors() {
             if (!response.ok) {
                 throw new Error(responseData?.detail || 'Failed to send message.');
             }
+
+            await logActivitySafely({
+                action: 'doctor_message_sent',
+                activity_type: 'doctor_message',
+                description: `Message sent to Dr. ${selectedDoctor.name}.`,
+                metadata: {
+                    doctor_id: selectedDoctor._id || selectedDoctor.id || null,
+                    doctor_user_id: selectedDoctor.user_id || null,
+                    doctor_name: selectedDoctor.name,
+                    specialization: selectedDoctor.specialization,
+                    hospital: selectedDoctor.hospital,
+                    message_length: trimmedMessage.length
+                }
+            });
 
             setSuccessMessage(`Message sent to ${selectedDoctor.name}.`);
             setSelectedDoctor(null);

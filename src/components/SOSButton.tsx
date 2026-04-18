@@ -1,5 +1,6 @@
 import { Phone, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 
@@ -171,6 +172,20 @@ function SOSButton() {
       if (!response.ok) {
         throw new Error(responseData?.detail || 'Failed to send the SOS alert.');
       }
+
+      await logActivitySafely({
+        action: 'sos_triggered',
+        activity_type: 'sos',
+        description: `SOS alert triggered from ${location.label}.`,
+        metadata: {
+          sos_id: responseData?._id || responseData?.id || null,
+          location_label: location.label,
+          latitude: location.latitude ?? null,
+          longitude: location.longitude ?? null,
+          accuracy: location.accuracy ?? null,
+          family_notifications_created: responseData?.family_notifications_created ?? 0
+        }
+      });
 
       const familyNotificationsCreated = responseData?.family_notifications_created ?? 0;
       setStatusMessage(
