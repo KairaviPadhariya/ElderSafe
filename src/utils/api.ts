@@ -70,7 +70,7 @@ export const api = {
   async getCurrentUser() {
     const token = localStorage.getItem('token');
 
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    const response = await fetch(`${API_BASE_URL}/users/me`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,

@@ -45,38 +45,6 @@ const handleLogin = async (e: React.FormEvent) => {
         localStorage.setItem("userRole", decoded.role);
       }
 
-      try {
-        const userResponse = await fetch(`${API_BASE_URL}/users/me`, {
-          headers: {
-            Authorization: `Bearer ${data.access_token}`
-          }
-        });
-
-        if (userResponse.ok) {
-              const userData = await userResponse.json();
-
-              console.log("User API response:", userData);
-
-              const resolvedUserName =
-                userData.name ||
-                userData.full_name ||
-                userData.username ||
-                userData.email?.split("@")[0] ||
-                normalizedEmail.split("@")[0] ||
-                normalizedEmail ||
-                "User";
-
-              localStorage.setItem("userName", resolvedUserName);
-              if (userData.email) {
-                localStorage.setItem("userEmail", userData.email);
-              }
-        } else {
-              console.warn("Failed to fetch user data:", userResponse.status);
-        }
-      } catch (userError) {
-        console.error("Failed to fetch user data:", userError);
-        localStorage.setItem("userName", fallbackUserName);
-      }
 
       // Remember email
       if (rememberMe) {
