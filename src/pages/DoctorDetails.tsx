@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, FileText, Mail, Phone, Save, Stethoscope, UserRound } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 
@@ -61,6 +62,21 @@ function DoctorDetails() {
             if (!response.ok) {
                 throw new Error(responseData?.detail || 'Failed to save doctor details.');
             }
+
+            await logActivitySafely({
+                action: 'doctor_profile_saved',
+                activity_type: 'doctor_profile',
+                description: `Doctor profile saved for ${name}.`,
+                metadata: {
+                    doctor_name: name,
+                    email,
+                    specialization: formData.specialization,
+                    hospital: formData.hospital,
+                    phone: formData.phone,
+                    license_no: formData.licenseNo || null,
+                    experience_years: formData.experienceYears ? Number(formData.experienceYears) : null
+                }
+            });
 
             navigate('/dashboard');
         } catch (submitError) {

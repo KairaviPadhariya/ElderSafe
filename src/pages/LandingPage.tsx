@@ -1,8 +1,64 @@
 import { Heart, Users, Shield, TrendingUp, Mail, Phone, MapPin, ArrowRight, Stethoscope, Clock, Award } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { createContactLog } from '../utils/logging';
 
 function LandingPage() {
     const navigate = useNavigate();
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        subject: '',
+        message: ''
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState('');
+    const [formSuccess, setFormSuccess] = useState('');
+
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = event.target;
+        setFormData((current) => ({
+            ...current,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setFormError('');
+        setFormSuccess('');
+
+        const trimmedPayload = {
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            subject: formData.subject.trim(),
+            message: formData.message.trim()
+        };
+
+        if (!trimmedPayload.name || !trimmedPayload.email || !trimmedPayload.subject || !trimmedPayload.message) {
+            setFormError('Please fill in all fields before sending your message.');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            await createContactLog(trimmedPayload);
+            setFormSuccess('Your message has been sent successfully. We will get back to you soon.');
+            setFormData({
+                name: '',
+                email: '',
+                subject: '',
+                message: ''
+            });
+        } catch (error) {
+            console.error('Failed to submit contact form:', error);
+            setFormError(error instanceof Error ? error.message : 'Unable to send your message right now.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-white">
@@ -233,11 +289,27 @@ function LandingPage() {
 
                         {/* Contact Form */}
                         <div className="bg-white rounded-2xl p-8 shadow-lg border border-slate-100">
-                            <form className="space-y-5">
+                            <form className="space-y-5" onSubmit={handleSubmit}>
+                                {formError && (
+                                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                        {formError}
+                                    </div>
+                                )}
+
+                                {formSuccess && (
+                                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                        {formSuccess}
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-900 mb-2">Name</label>
                                     <input
                                         type="text"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        disabled={isSubmitting}
                                         className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900"
                                         placeholder="Your name"
                                     />
@@ -246,6 +318,10 @@ function LandingPage() {
                                     <label className="block text-sm font-medium text-slate-900 mb-2">Email</label>
                                     <input
                                         type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        disabled={isSubmitting}
                                         className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900"
                                         placeholder="your@email.com"
                                     />
@@ -254,6 +330,10 @@ function LandingPage() {
                                     <label className="block text-sm font-medium text-slate-900 mb-2">Subject</label>
                                     <input
                                         type="text"
+                                        name="subject"
+                                        value={formData.subject}
+                                        onChange={handleChange}
+                                        disabled={isSubmitting}
                                         className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900"
                                         placeholder="How can we help?"
                                     />
@@ -262,15 +342,20 @@ function LandingPage() {
                                     <label className="block text-sm font-medium text-slate-900 mb-2">Message</label>
                                     <textarea
                                         rows={4}
+                                        name="message"
+                                        value={formData.message}
+                                        onChange={handleChange}
+                                        disabled={isSubmitting}
                                         className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900"
                                         placeholder="Your message..."
-                                    ></textarea>
+                                    />
                                 </div>
                                 <button
                                     type="submit"
+                                    disabled={isSubmitting}
                                     className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium py-2.5 rounded-lg transition-all shadow-md"
                                 >
-                                    Send Message
+                                    {isSubmitting ? 'Sending...' : 'Send Message'}
                                 </button>
                             </form>
                         </div>

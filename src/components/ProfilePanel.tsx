@@ -1,6 +1,7 @@
 import { X, User, Mail, Phone, MapPin, AlertCircle, LogOut, Edit2 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { logActivitySafely } from '../utils/logging';
 
 interface ProfilePanelProps {
   isOpen: boolean;
@@ -61,8 +62,7 @@ type FamilyRecord = {
   address?: string | null;
 };
 
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 function createFallbackProfile(
   role: string,
@@ -384,6 +384,24 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           throw new Error(responseData?.detail || 'Failed to update doctor profile.');
         }
 
+        await logActivitySafely({
+          action: 'profile_updated',
+          activity_type: 'doctor_profile',
+          description: 'Doctor profile updated from profile panel.',
+          metadata: {
+            profile_role: role,
+            name: editFormData.name,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            hospital: editFormData.address,
+            specialization: editFormData.specialization || 'Doctor',
+            license_no: editFormData.licenseNo || null,
+            experience_years: editFormData.experienceYears
+              ? Number.parseInt(editFormData.experienceYears, 10) || null
+              : null
+          }
+        });
+
       } catch (error) {
         console.error('Failed to save doctor profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update doctor profile.');
@@ -447,6 +465,20 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           address: editFormData.address,
           emergency_contact_phone: editFormData.emergencyContactPhone,
         }));
+
+        await logActivitySafely({
+          action: 'profile_updated',
+          activity_type: 'patient_profile',
+          description: 'Patient profile updated from profile panel.',
+          metadata: {
+            profile_role: role,
+            name: editFormData.name,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            address: editFormData.address,
+            emergency_contact_phone: editFormData.emergencyContactPhone || null
+          }
+        });
       } catch (error) {
         console.error('Failed to save patient profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update patient profile.');
@@ -498,6 +530,21 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
           phone: editFormData.phone,
           address: editFormData.address,
         }));
+
+        await logActivitySafely({
+          action: 'profile_updated',
+          activity_type: 'family_profile',
+          description: 'Family profile updated from profile panel.',
+          metadata: {
+            profile_role: role,
+            name: editFormData.name,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            address: editFormData.address,
+            patient_id: familyRecord.patient_id || null,
+            patient_name: familyRecord.patient_name || null
+          }
+        });
       } catch (error) {
         console.error('Failed to save family profile:', error);
         alert(error instanceof Error ? error.message : 'Failed to update family profile.');
@@ -510,6 +557,19 @@ function ProfilePanel({ isOpen, onClose, role }: ProfilePanelProps) {
         phone: editFormData.phone,
         address: editFormData.address,
       }));
+
+      await logActivitySafely({
+        action: 'profile_updated',
+        activity_type: 'local_profile',
+        description: 'Profile updated in local storage.',
+        metadata: {
+          profile_role: role,
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          address: editFormData.address
+        }
+      });
     }
 
     setDisplayProfile(prev => ({

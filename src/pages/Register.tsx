@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Heart, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, decodeJWT } from '../utils/api';
-import { registerUser } from '../services/api';
 
 function Register() {
     const [loading, setLoading] = useState(false);
@@ -44,7 +43,7 @@ function Register() {
         }
 
         try {
-            await registerUser(name.trim(), email.trim(), password, role);
+            await api.register({ name: name.trim(), email: email.trim(), password, role });
             if (role === 'patient' || role === 'doctor' || role === 'family') {
                 const loginData = await api.login({ email: email.trim(), password });
                 const decoded = decodeJWT(loginData.access_token);

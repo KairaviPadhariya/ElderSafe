@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HeartHandshake, ShieldCheck, UserRound, Phone, MapPin, Save } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
 const API_BASE_URL = 'http://34.233.187.127:8000';
 
@@ -103,6 +104,21 @@ function FamilyDetails() {
             if (!response.ok) {
                 throw new Error(responseData?.detail || 'Failed to save family details.');
             }
+
+            await logActivitySafely({
+                action: 'family_profile_saved',
+                activity_type: 'family_profile',
+                description: `Family access saved for ${formData.patientName}.`,
+                metadata: {
+                    family_name: name,
+                    email,
+                    patient_id: formData.patientId || null,
+                    patient_name: formData.patientName,
+                    relation: formData.relation,
+                    access_level: formData.accessLevel,
+                    phone: formData.phone || null
+                }
+            });
 
             navigate('/dashboard');
         } catch (submitError) {

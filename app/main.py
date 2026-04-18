@@ -9,6 +9,7 @@ from app.routes import (
     appointments,
     medications,
     activity_logs,
+    contact_logs,
     audit_logs,
     family,
     daily_health_logs,
@@ -32,7 +33,11 @@ ALLOWED_ORIGINS = [
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://34.233.187.127:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +49,7 @@ app.include_router(doctors.router)
 app.include_router(appointments.router)
 app.include_router(medications.router)
 app.include_router(activity_logs.router)
+app.include_router(contact_logs.router)
 app.include_router(audit_logs.router)
 app.include_router(family.router)
 app.include_router(daily_health_logs.router)

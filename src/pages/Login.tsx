@@ -3,8 +3,7 @@ import { Heart, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, decodeJWT } from '../utils/api';
 
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const API_BASE_URL = 'http://34.233.187.127:8000';
 
 function Login() {
     const [email, setEmail] = useState("");
@@ -46,38 +45,6 @@ const handleLogin = async (e: React.FormEvent) => {
         localStorage.setItem("userRole", decoded.role);
       }
 
-      try {
-        const userResponse = await fetch(`${API_BASE_URL}/users/me`, {
-          headers: {
-            Authorization: `Bearer ${data.access_token}`
-          }
-        });
-
-        if (userResponse.ok) {
-              const userData = await userResponse.json();
-
-              console.log("User API response:", userData);
-
-              const resolvedUserName =
-                userData.name ||
-                userData.full_name ||
-                userData.username ||
-                userData.email?.split("@")[0] ||
-                normalizedEmail.split("@")[0] ||
-                normalizedEmail ||
-                "User";
-
-              localStorage.setItem("userName", resolvedUserName);
-              if (userData.email) {
-                localStorage.setItem("userEmail", userData.email);
-              }
-        } else {
-              console.warn("Failed to fetch user data:", userResponse.status);
-        }
-      } catch (userError) {
-        console.error("Failed to fetch user data:", userError);
-        localStorage.setItem("userName", fallbackUserName);
-      }
 
       // Remember email
       if (rememberMe) {

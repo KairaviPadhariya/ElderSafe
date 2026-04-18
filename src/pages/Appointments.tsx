@@ -1,9 +1,11 @@
-import { Calendar, Clock, MapPin, Plus, Edit2, Stethoscope } from 'lucide-react';
+import { Calendar, Clock, FileText, MapPin, Pill, Plus, Edit2, Stethoscope } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import BackButton from '../components/BackButton';
+import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 type Appointment = {
     _id?: string;
@@ -18,6 +20,7 @@ type Appointment = {
     reason?: string;
     location?: string;
     status?: string;
+    doctor_note?: string | null;
     image?: string;
 };
 
@@ -130,9 +133,21 @@ function Appointments() {
     const [saving, setSaving] = useState(false);
     const [updatingId, setUpdatingId] = useState<string | number | null>(null);
     const [cancellingId, setCancellingId] = useState<string | number | null>(null);
+    const [prescribingId, setPrescribingId] = useState<string | number | null>(null);
+    const [prescriptionSavingId, setPrescriptionSavingId] = useState<string | number | null>(null);
     const [error, setError] = useState('');
     const [currentTime, setCurrentTime] = useState(() => new Date());
     const [patientNamesByAppointment, setPatientNamesByAppointment] = useState<Record<string, string>>({});
+    const [prescriptionData, setPrescriptionData] = useState({
+        doctorNote: '',
+        medicineName: '',
+        dosage: '',
+        frequency: 'Once daily',
+        times: ['08:00'],
+        instructions: '',
+        startDate: new Date().toISOString().slice(0, 10),
+        durationDays: '30',
+    });
 
     const visibleAppointments = appointments.filter((appointment) => isUpcomingAppointment(appointment, currentTime));
     const minDate = getTodayDate();
@@ -231,6 +246,24 @@ function Appointments() {
         return selectedDate === minDate ? getCurrentTime() : undefined;
     };
 
+    const getDefaultTimesForFrequency = (frequency: string) => {
+        const defaultTimes: Record<string, string[]> = {
+            'Once daily': ['08:00'],
+            'Twice daily': ['08:00', '20:00'],
+            'Thrice daily': ['08:00', '14:00', '20:00'],
+            'Three times daily': ['08:00', '14:00', '20:00'],
+            'Four times daily': ['06:00', '12:00', '18:00', '22:00'],
+            'As needed': ['08:00'],
+        };
+
+        return [...(defaultTimes[frequency] || ['08:00'])];
+    };
+
+    const normalizeTimesForFrequency = (currentTimes: string[], frequency: string) => {
+        const defaultTimes = getDefaultTimesForFrequency(frequency);
+        return defaultTimes.map((defaultTime, index) => currentTimes[index] || defaultTime);
+    };
+
     const handleAddAppointment = async () => {
         if (!newAppointment.doctor || !newAppointment.date || !newAppointment.time) {
             setError('Doctor, date, and time are required.');
@@ -248,7 +281,7 @@ function Appointments() {
         setError('');
 
         try {
-            await requestJson(`${API_BASE_URL}/appointments`, {
+            const savedAppointment = await requestJson(`${API_BASE_URL}/appointments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -264,6 +297,22 @@ function Appointments() {
                     reason: newAppointment.specialty || 'General appointment',
                     status: 'upcoming'
                 })
+            });
+
+            await logActivitySafely({
+                action: 'appointment_created',
+                activity_type: 'appointment',
+                description: `Appointment booked with ${newAppointment.doctor} for ${newAppointment.date} at ${newAppointment.time}.`,
+                metadata: {
+                    appointment_id: savedAppointment?._id || savedAppointment?.id || null,
+                    doctor_id: newAppointment.doctorId,
+                    doctor_name: newAppointment.doctor,
+                    specialty: newAppointment.specialty,
+                    date: newAppointment.date,
+                    time: newAppointment.time,
+                    location: newAppointment.location,
+                    actor_role: role
+                }
             });
 
             await loadAppointments();
@@ -294,6 +343,7 @@ function Appointments() {
         setError('');
 
         try {
+            const existingAppointment = appointments.find((appointment) => (appointment._id ?? appointment.id) === id);
             const data = await requestJson(`${API_BASE_URL}/appointments/${id}`, {
                 method: 'PUT',
                 headers: {
@@ -305,6 +355,22 @@ function Appointments() {
                     time: rescheduleData.time,
                     status: 'upcoming'
                 })
+            });
+
+            await logActivitySafely({
+                action: 'appointment_rescheduled',
+                activity_type: 'appointment',
+                description: `Appointment moved to ${rescheduleData.date} at ${rescheduleData.time}.`,
+                metadata: {
+                    appointment_id: id,
+                    previous_date: existingAppointment?.date || null,
+                    previous_time: existingAppointment?.time || null,
+                    new_date: rescheduleData.date,
+                    new_time: rescheduleData.time,
+                    doctor_name: existingAppointment?.doctor_name || null,
+                    patient_name: existingAppointment?.patient_name || null,
+                    actor_role: role
+                }
             });
 
             setAppointments((current) =>
@@ -332,10 +398,26 @@ function Appointments() {
         setError('');
 
         try {
+            const existingAppointment = appointments.find((appointment) => (appointment._id ?? appointment.id) === id);
             await requestJson(`${API_BASE_URL}/appointments/${id}`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`
+                }
+            });
+
+            await logActivitySafely({
+                action: 'appointment_cancelled',
+                activity_type: 'appointment',
+                description: `Appointment cancelled for ${existingAppointment?.date || 'the scheduled date'} at ${existingAppointment?.time || 'the scheduled time'}.`,
+                metadata: {
+                    appointment_id: id,
+                    doctor_name: existingAppointment?.doctor_name || null,
+                    patient_name: existingAppointment?.patient_name || null,
+                    date: existingAppointment?.date || null,
+                    time: existingAppointment?.time || null,
+                    location: existingAppointment?.location || null,
+                    actor_role: role
                 }
             });
 
@@ -373,6 +455,135 @@ function Appointments() {
             specialty: selectedDoctor?.specialization || '',
             location: selectedDoctor?.hospital || ''
         }));
+    };
+
+    const startPrescription = (appointment: Appointment) => {
+        const appointmentId = appointment._id ?? appointment.id;
+        setPrescribingId(appointmentId ?? null);
+        setPrescriptionData({
+            doctorNote: appointment.doctor_note || '',
+            medicineName: '',
+            dosage: '',
+            frequency: 'Once daily',
+            times: getDefaultTimesForFrequency('Once daily'),
+            instructions: '',
+            startDate: appointment.date || new Date().toISOString().slice(0, 10),
+            durationDays: '30',
+        });
+        setError('');
+    };
+
+    const handlePrescriptionFieldChange = (
+        event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => {
+        const { name, value } = event.target;
+
+        if (name === 'frequency') {
+            setPrescriptionData((current) => ({
+                ...current,
+                frequency: value,
+                times: normalizeTimesForFrequency(current.times, value),
+            }));
+            return;
+        }
+
+        setPrescriptionData((current) => ({
+            ...current,
+            [name]: value,
+        }));
+    };
+
+    const handlePrescriptionTimeChange = (index: number, value: string) => {
+        setPrescriptionData((current) => ({
+            ...current,
+            times: current.times.map((time, timeIndex) => (timeIndex === index ? value : time)),
+        }));
+    };
+
+    const handleSavePrescription = async (appointment: Appointment) => {
+        const appointmentId = appointment._id ?? appointment.id;
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            setError('Please log in again to save the doctor note and medication.');
+            return;
+        }
+
+        if (!appointmentId) {
+            setError('This appointment is missing an ID and cannot be updated.');
+            return;
+        }
+
+        if (!prescriptionData.medicineName || !prescriptionData.dosage || !prescriptionData.startDate) {
+            setError('Medication name, dosage, and start date are required.');
+            return;
+        }
+
+        setPrescriptionSavingId(appointmentId);
+        setError('');
+
+        try {
+            const times = prescriptionData.times.map((value) => value.trim()).filter(Boolean);
+            const savedMedication = await requestJson(`${API_BASE_URL}/appointments/${appointmentId}/medications`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    medicine_name: prescriptionData.medicineName,
+                    dosage: prescriptionData.dosage,
+                    frequency: prescriptionData.frequency,
+                    times,
+                    instructions: prescriptionData.instructions || null,
+                    start_date: prescriptionData.startDate,
+                    duration_days: Number.parseInt(prescriptionData.durationDays, 10),
+                    doctor_note: prescriptionData.doctorNote || null
+                })
+            });
+
+            await logActivitySafely({
+                action: 'doctor_prescribed_medication',
+                activity_type: 'medication',
+                description: `Doctor prescribed ${prescriptionData.medicineName} for ${appointment.patient_name || 'the patient'}.`,
+                metadata: {
+                    appointment_id: appointmentId,
+                    patient_id: appointment.patient_id || null,
+                    patient_name: appointment.patient_name || null,
+                    medicine_name: prescriptionData.medicineName,
+                    dosage: prescriptionData.dosage,
+                    frequency: prescriptionData.frequency,
+                    times,
+                    duration_days: Number.parseInt(prescriptionData.durationDays, 10),
+                    medication_id: savedMedication?._id || null,
+                    doctor_note: prescriptionData.doctorNote || null,
+                }
+            });
+
+            setAppointments((current) =>
+                current.map((currentAppointment) =>
+                    (currentAppointment._id ?? currentAppointment.id) === appointmentId
+                        ? { ...currentAppointment, doctor_note: prescriptionData.doctorNote || null }
+                        : currentAppointment
+                )
+            );
+            setPrescribingId(null);
+            setPrescriptionData({
+                doctorNote: '',
+                medicineName: '',
+                dosage: '',
+                frequency: 'Once daily',
+                times: ['08:00'],
+                instructions: '',
+                startDate: new Date().toISOString().slice(0, 10),
+                durationDays: '30',
+            });
+        } catch (saveError) {
+            console.error('Failed to save doctor note and medication:', saveError);
+            setError(saveError instanceof Error ? saveError.message : 'Unable to save doctor note and medication.');
+        } finally {
+            setPrescriptionSavingId(null);
+        }
     };
 
     return (
@@ -577,7 +788,8 @@ function Appointments() {
                                     </div>
                                 </div>
                             ) : (
-                                <div key={appointmentId} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:shadow-md transition-shadow">
+                                <div key={appointmentId} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-6 hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                                     <div className="w-20 h-20 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/30">
                                         <Stethoscope className="w-9 h-9 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                                     </div>
@@ -588,7 +800,9 @@ function Appointments() {
                                                 {apt.status === 'past' ? 'Past' : 'Upcoming'}
                                             </span>
                                         </div>
-                                        <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm mb-3">{specialty}</p>
+                                        {canCreateAppointments && (
+                                            <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm mb-3">{specialty}</p>
+                                        )}
 
                                         <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400">
                                             <div className="flex items-center gap-1.5">
@@ -604,6 +818,11 @@ function Appointments() {
                                                 {location}
                                             </div>
                                         </div>
+                                        {!canCreateAppointments && apt.doctor_note && (
+                                            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                                                Doctor note: {apt.doctor_note}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                                         <button
@@ -620,7 +839,142 @@ function Appointments() {
                                         >
                                             {cancellingId === appointmentId ? 'Cancelling...' : 'Cancel'}
                                         </button>
+                                        {!canCreateAppointments && (
+                                            <button
+                                                onClick={() => startPrescription(apt)}
+                                                className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
+                                            >
+                                                Add Note & Medication
+                                            </button>
+                                        )}
                                     </div>
+                                </div>
+                                {!canCreateAppointments && prescribingId === appointmentId && (
+                                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-900/10 p-5">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Pill className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                            <h5 className="font-semibold text-slate-900 dark:text-white">
+                                                Prescription for {appointmentName}
+                                            </h5>
+                                        </div>
+                                        <div className="mb-4 rounded-xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-emerald-900/40 dark:bg-slate-900/30 dark:text-slate-300">
+                                            Appointment date: <span className="font-semibold text-slate-900 dark:text-white">{apt.date}</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Prescription note</label>
+                                                <textarea
+                                                    name="doctorNote"
+                                                    rows={3}
+                                                    value={prescriptionData.doctorNote}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                    placeholder="Doctor's note, diagnosis, or advice for this prescription"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Medication name</label>
+                                                <input
+                                                    name="medicineName"
+                                                    value={prescriptionData.medicineName}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                    placeholder="Medicine name"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Dosage</label>
+                                                <input
+                                                    name="dosage"
+                                                    value={prescriptionData.dosage}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                    placeholder="500 mg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Frequency</label>
+                                                <select
+                                                    name="frequency"
+                                                    value={prescriptionData.frequency}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                >
+                                                    <option>Once daily</option>
+                                                    <option>Twice daily</option>
+                                                    <option>Thrice daily</option>
+                                                    <option>Three times daily</option>
+                                                    <option>Four times daily</option>
+                                                    <option>As needed</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Prescription date</label>
+                                                <input
+                                                    type="date"
+                                                    name="startDate"
+                                                    value={prescriptionData.startDate}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Duration (days)</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    name="durationDays"
+                                                    value={prescriptionData.durationDays}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/30 px-4 py-3">
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">Dose times</p>
+                                                <div className="space-y-3">
+                                                    {prescriptionData.times.map((time, index) => (
+                                                        <div key={`${prescriptionData.frequency}-${index}`} className="flex items-center gap-3">
+                                                            <label className="w-24 text-sm text-slate-500 dark:text-slate-400">Dose {index + 1}</label>
+                                                            <input
+                                                                type="time"
+                                                                value={time}
+                                                                onChange={(event) => handlePrescriptionTimeChange(index, event.target.value)}
+                                                                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-4 py-2.5 dark:text-white outline-none"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Medication instructions</label>
+                                                <textarea
+                                                    name="instructions"
+                                                    rows={3}
+                                                    value={prescriptionData.instructions}
+                                                    onChange={handlePrescriptionFieldChange}
+                                                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3 dark:text-white outline-none"
+                                                    placeholder="Take after food, before sleep, or other instructions"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap gap-3">
+                                            <button
+                                                onClick={() => handleSavePrescription(apt)}
+                                                disabled={prescriptionSavingId === appointmentId}
+                                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
+                                            >
+                                                <FileText className="w-4 h-4" />
+                                                {prescriptionSavingId === appointmentId ? 'Saving...' : 'Save Prescription'}
+                                            </button>
+                                            <button
+                                                onClick={() => setPrescribingId(null)}
+                                                className="rounded-xl bg-slate-100 dark:bg-slate-700 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200"
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 </div>
                             );
                         })}

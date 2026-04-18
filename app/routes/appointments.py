@@ -180,6 +180,13 @@ async def get_doctor_dashboard(current_user: dict = Depends(verify_token)):
         ]):
             serialized = serialize_appointment(appointment)
             patient_id = serialized.get("patient_id")
+            latest_doctor_medication = await database.medications_doctor.find_one(
+                {"appointment_id": serialized["_id"]},
+                sort=[("created_at", -1)]
+            )
+
+            if latest_doctor_medication:
+                serialized["doctor_note"] = latest_doctor_medication.get("doctor_note")
 
             if patient_id:
                 patient_ids.add(patient_id)

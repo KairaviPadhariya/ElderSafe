@@ -1,98 +1,87 @@
-const API_URL = "http://34.233.187.127:8000";
+const API_BASE_URL = "http://34.233.187.127:8000";
 
-export const registerUser = async (name: string, email: string, password: string, role: string) => {
-  const response = await fetch(`${API_URL}/users`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ name, email, password, role })
-  });
+interface LoginData {
+  email: string;
+  password: string;
+}
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Registration failed");
-  }
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+}
 
-  return response.json();
-};
+function decodeJWT(token: string) {
+  const payload = token.split(".")[1];
+  const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+  return decoded;
+}
 
-export const loginUser = async (email: string, password: string) => {
-  const formData = new URLSearchParams();
-  formData.append("username", email);
-  formData.append("password", password);
-
-  const response = await fetch(`${API_URL}/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: formData.toString()
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Login failed");
-  }
-
-  return response.json();
-};
-
-export const getNotifications = async () => {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(`${API_URL}/notifications`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to fetch notifications");
-  }
-
-  return response.json();
-};
-
-export const uploadDocument = async (file: File) => {
-  const token = localStorage.getItem("token");
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch(`${API_URL}/medical-documents`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
-    body: formData
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Document upload failed");
-  }
-
-  return response.json();
-};
+export { decodeJWT };
 
 export const api = {
-  register: registerUser,
-  login: async ({ email, password }: { email: string; password: string }) => {
-    return loginUser(email, password);
-  },
-  getNotifications,
-  uploadDocument
-};
+  async login(data: LoginData) {
+    const formData = new URLSearchParams();
+    formData.append("username", data.email.trim());
+    formData.append("password", data.password);
 
-export const decodeJWT = (token: string) => {
-  try {
-    const payload = token.split(".")[1];
-    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decoded);
-  } catch (error) {
-    console.error("Failed to decode JWT:", error);
-    return null;
+    const response = await fetch(`${API_BASE_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formData.toString(),
+    });
+
+    const responseText = await response.text();
+    const responseData = responseText ? JSON.parse(responseText) : null;
+
+    if (!response.ok) {
+      throw new Error(responseData?.detail || "Login failed");
+    }
+
+    return responseData;
+  },
+
+  async register(data: RegisterData) {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Registration failed: ${responseText}`);
+    }
+
+    return responseText ? JSON.parse(responseText) : null;
+  },
+
+  async getHealth() {
+    const response = await fetch(`${API_BASE_URL}/health`);
+    return response.json();
+  },
+
+  async getCurrentUser() {
+    const token = localStorage.getItem("token");
+
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch user");
+    }
+
+    return response.json();
   }
 };
