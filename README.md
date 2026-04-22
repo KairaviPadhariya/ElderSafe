@@ -1,4 +1,4 @@
-# ElderSafe 🛡️
+# ElderSafe 
 
 A comprehensive web-based platform designed to monitor senior citizens' health data, predict potential health risks, and facilitate secure communication of emergency alerts. The solution leverages modern web technologies, machine learning, and established DevOps practices.
 
