@@ -31,7 +31,7 @@ A comprehensive web-based platform designed to monitor senior citizens' health d
 **DevOps & Infrastructure**
 *   Docker & Docker Compose (Containerization)
 *   Jenkins (CI/CD Pipeline)
-*   Nginx (Reverse Proxy / Deployment)
+*   AWS EC2 (Cloud Deployment)
 
 ## 📁 Project Structure
 
@@ -97,16 +97,17 @@ npm install
 npm run dev
 ```
 
-### 3. Running with Docker (Production Mode)
+### 3. Cloud Deployment (AWS EC2)
 
-Ensure Docker daemon is running and execute:
+The application is deployed on an AWS EC2 instance. Ensure Docker is installed on your EC2 instance and execute:
 
 ```bash
 # Build and spin up the entire stack
 docker-compose up --build -d
 ```
-*   The **Frontend** will be accessible at `http://localhost:80` (or the port defined in Nginx/Compose).
-*   The **Backend Options/API Docs** will be available at `http://localhost:8000/docs`.
+
+*   The **Frontend** will be accessible publicly via the EC2 instance's IP address on port `5173` (e.g., `http://<EC2_PUBLIC_IP>:5173`).
+*   The **Backend Options/API Docs** will be available at `http://<EC2_PUBLIC_IP>:8000/docs`.
 
 ## 🤖 CI/CD Pipeline
 
