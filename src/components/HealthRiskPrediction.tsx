@@ -6,7 +6,7 @@ import { predictSafetyStatus } from '../services/seniorSafetyApi';
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
-const AUTO_SOS_THRESHOLD = 3;
+const AUTO_SOS_CONFIDENCE_THRESHOLD = 0.85;
 
 type PatientProfile = {
   _id?: string;
@@ -38,10 +38,12 @@ type DailyHealthLog = {
   o2_saturation?: number | null;
   fasting_blood_glucose?: number | null;
   post_prandial_glucose?: number | null;
+  cholesterol?: number | null;
 };
 
 type PredictionResult = {
   prediction: 'normal' | 'warning' | 'emergency';
+  model_prediction?: 'normal' | 'warning' | 'emergency';
   rule_based_label: 'normal' | 'warning' | 'emergency';
   probabilities: Record<string, number>;
   personalized_baseline: Record<string, number>;
@@ -285,6 +287,7 @@ function buildPredictionReasons(result: PredictionResult | null, payload: Predic
 
   const baseline = result.personalized_baseline;
   const reasons: Array<{ severity: number; message: string }> = [];
+  const hasBpOrCardiacHistory = payload.has_hypertension || payload.has_cardiac_history;
 
   const metricChecks = [
     {
@@ -308,18 +311,18 @@ function buildPredictionReasons(result: PredictionResult | null, payload: Predic
       value: payload.sbp,
       baseline: baseline.sbp,
       warningDelta: 10,
-      emergencyDelta: 30,
+      emergencyDelta: hasBpOrCardiacHistory ? 15 : 30,
       lowerIsWorse: false,
-      absoluteDifference: true,
+      absoluteDifference: !hasBpOrCardiacHistory,
       label: 'Systolic blood pressure'
     },
     {
       value: payload.dbp,
       baseline: baseline.dbp,
       warningDelta: 10,
-      emergencyDelta: 20,
+      emergencyDelta: hasBpOrCardiacHistory ? 15 : 20,
       lowerIsWorse: false,
-      absoluteDifference: true,
+      absoluteDifference: !hasBpOrCardiacHistory,
       label: 'Diastolic blood pressure'
     },
     {
@@ -390,7 +393,7 @@ function buildPredictionReasons(result: PredictionResult | null, payload: Predic
   if (highestProbability) {
     reasons.push({
       severity: 0,
-      message: `The model is most confident in ${highestProbability[0]} at ${Math.round(highestProbability[1] * 100)}%.`
+      message: `The rule engine finalized ${result.prediction} at ${Math.round((result.alert.confidence || highestProbability[1]) * 100)}% confidence.`
     });
   }
 
@@ -487,7 +490,7 @@ function HealthRiskPrediction({
         dbp: latestLog?.diastolic_bp ?? profile?.dbp ?? null,
         fbs: latestLog?.fasting_blood_glucose ?? profile?.fbs ?? null,
         ppbs: latestLog?.post_prandial_glucose ?? profile?.ppbs ?? null,
-        cholesterol: profile?.cholesterol ?? null,
+        cholesterol: latestLog?.cholesterol ?? profile?.cholesterol ?? null,
         has_hypertension: Boolean(profile?.has_bp),
         has_diabetes: Boolean(profile?.has_diabetes),
         has_cardiac_history: Boolean(profile?.has_cardiac_history)
@@ -514,9 +517,14 @@ function HealthRiskPrediction({
         throw new Error(`More health data is needed for prediction: ${missingFields.join(', ')}.`);
       }
 
+      const age = Number(payload.age);
+      if (age < 55 || age > 110) {
+        throw new Error('ML prediction needs a senior patient age between 55 and 110. Update the saved medical details age to continue.');
+      }
+
       const normalizedPayload: PredictionPayloadSnapshot = {
         patient_id: payload.patient_id ?? undefined,
-        age: Number(payload.age),
+        age,
         gender: String(payload.gender),
         weight: Number(payload.weight),
         bmi: Number(payload.bmi),
@@ -601,12 +609,11 @@ function HealthRiskPrediction({
       return;
     }
 
-    const processEmergencyStreak = async () => {
+    const processEmergencyConfidence = async () => {
       if (!result || !resolvedPatientId) {
         return;
       }
 
-      const streakKey = getPatientStorageKey(resolvedPatientId, 'emergency-streak');
       const triggerKey = getPatientStorageKey(resolvedPatientId, 'last-auto-sos');
       const processedLogKey = getPatientStorageKey(resolvedPatientId, 'last-sos-counted-log');
       const todayKey = getCurrentDateKey();
@@ -623,31 +630,28 @@ function HealthRiskPrediction({
 
       if (result.prediction !== 'emergency') {
         localStorage.setItem(processedLogKey, latestLogEventKey);
-        localStorage.setItem(streakKey, '0');
         setAutoSosMessage('');
         return;
       }
 
-      const nextStreak = Number(localStorage.getItem(streakKey) || '0') + 1;
       localStorage.setItem(processedLogKey, latestLogEventKey);
-      localStorage.setItem(streakKey, String(nextStreak));
 
-      if (nextStreak < AUTO_SOS_THRESHOLD) {
-        setAutoSosMessage(`Emergency prediction ${nextStreak}/${AUTO_SOS_THRESHOLD}. SOS will trigger only after repeated emergency detections.`);
+      if ((result.alert.confidence || 0) < AUTO_SOS_CONFIDENCE_THRESHOLD) {
+        setAutoSosMessage(`Emergency prediction confidence is ${Math.round((result.alert.confidence || 0) * 100)}%. SOS triggers at 85% or higher.`);
         return;
       }
 
       const lastTriggerDate = localStorage.getItem(triggerKey);
 
       if (lastTriggerDate === todayKey) {
-        setAutoSosMessage('Automatic SOS was already sent today after repeated emergency predictions.');
+        setAutoSosMessage('Automatic SOS was already sent today for a high-confidence emergency prediction.');
         return;
       }
 
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          setAutoSosMessage('Emergency threshold reached, but SOS could not be sent because you are logged out.');
+          setAutoSosMessage('Emergency confidence threshold reached, but SOS could not be sent because you are logged out.');
           return;
         }
 
@@ -665,7 +669,7 @@ function HealthRiskPrediction({
         });
 
         localStorage.setItem(triggerKey, todayKey);
-        setAutoSosMessage(`Automatic SOS sent after ${AUTO_SOS_THRESHOLD} consecutive emergency predictions.`);
+        setAutoSosMessage('Automatic SOS sent for an emergency prediction at 85% confidence or higher.');
         window.dispatchEvent(new CustomEvent('notifications-updated'));
       } catch (autoSosError) {
         console.error('Failed to auto-trigger SOS:', autoSosError);
@@ -673,13 +677,26 @@ function HealthRiskPrediction({
       }
     };
 
-    processEmergencyStreak();
+    processEmergencyConfidence();
   }, [allowAutoSos, latestLogDate, latestLogEventKey, resolvedPatientId, result]);
 
   const presentation = useMemo(() => {
     const status = result?.prediction ?? 'normal';
+    const confidence = result?.alert.confidence ?? 0;
 
     if (status === 'emergency') {
+      if (confidence < AUTO_SOS_CONFIDENCE_THRESHOLD) {
+        return {
+          badgeClasses: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300',
+          panelClasses: 'border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-amber-50 dark:border-orange-900/60 dark:from-orange-950/40 dark:via-slate-900 dark:to-slate-900',
+          accentIconClasses: 'bg-orange-500 text-white shadow-orange-500/25 dark:bg-orange-500 dark:text-white',
+          statusIconClasses: 'text-orange-500 dark:text-orange-400',
+          probabilityBarClasses: 'bg-orange-500 dark:bg-orange-400',
+          Icon: Siren,
+          heading: 'Emergency risk detected'
+        };
+      }
+
       return {
         badgeClasses: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
         panelClasses: 'border-rose-200/80 bg-gradient-to-br from-rose-50 via-white to-orange-50 dark:border-rose-900/60 dark:from-rose-950/40 dark:via-slate-900 dark:to-slate-900',

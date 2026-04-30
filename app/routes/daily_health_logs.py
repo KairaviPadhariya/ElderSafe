@@ -1,12 +1,15 @@
 from datetime import datetime
+from pathlib import Path
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.database import database
+from app.ml_safety.inference import predict_situation
 from app.schemas.daily_health_log import DailyHealthLogCreate
 from app.utils.auth import verify_token
 
 router = APIRouter()
+ML_MODEL_PATH = Path("artifacts") / "ml_safety" / "models" / "best_model.pkl"
 
 
 def serialize_health_log(log: dict):
@@ -79,6 +82,127 @@ def dedupe_preserve_order(values: list[str | None]) -> list[str]:
         ordered.append(normalized)
 
     return ordered
+
+
+def calculate_bmi(weight: float | None, height: float | None) -> float | None:
+    if not weight or not height or height <= 0:
+        return None
+
+    return round(weight / ((height / 100) ** 2), 1)
+
+
+def first_present(*values):
+    for value in values:
+        if value is not None and value != "":
+            return value
+
+    return None
+
+
+def build_prediction_payload(patient_id: str, patient_profile: dict, log: dict) -> dict | None:
+    weight = first_present(log.get("weight"), patient_profile.get("weight"))
+    bmi = first_present(patient_profile.get("bmi"), calculate_bmi(weight, patient_profile.get("height")))
+
+    payload = {
+        "patient_id": patient_id,
+        "age": patient_profile.get("age"),
+        "gender": patient_profile.get("gender"),
+        "weight": weight,
+        "bmi": bmi,
+        "o2_saturation": first_present(log.get("o2_saturation"), patient_profile.get("o2_saturation")),
+        "hr": first_present(log.get("heart_rate"), patient_profile.get("heart_rate")),
+        "sbp": first_present(log.get("systolic_bp"), patient_profile.get("sbp")),
+        "dbp": first_present(log.get("diastolic_bp"), patient_profile.get("dbp")),
+        "fbs": first_present(log.get("fasting_blood_glucose"), patient_profile.get("fbs")),
+        "ppbs": first_present(log.get("post_prandial_glucose"), patient_profile.get("ppbs")),
+        "cholesterol": first_present(log.get("cholesterol"), patient_profile.get("cholesterol")),
+        "has_hypertension": bool(patient_profile.get("has_bp")),
+        "has_diabetes": bool(patient_profile.get("has_diabetes")),
+        "has_cardiac_history": bool(patient_profile.get("has_cardiac_history")),
+    }
+
+    required_fields = [
+        "age",
+        "gender",
+        "weight",
+        "bmi",
+        "o2_saturation",
+        "hr",
+        "sbp",
+        "dbp",
+        "fbs",
+        "ppbs",
+        "cholesterol",
+    ]
+
+    if any(payload.get(field) is None for field in required_fields):
+        return None
+
+    age = int(payload["age"])
+    if age < 55 or age > 110:
+        return None
+
+    return payload
+
+
+async def find_patient_profile_for_aliases(patient_aliases: list[str]) -> dict | None:
+    object_ids = [ObjectId(value) for value in patient_aliases if ObjectId.is_valid(value)]
+    profile = await database.patients.find_one({"user_id": {"$in": patient_aliases}})
+
+    if profile:
+        return profile
+
+    if object_ids:
+        return await database.patients.find_one({"_id": {"$in": object_ids}})
+
+    return None
+
+
+async def save_prediction_for_log(patient_id: str, patient_aliases: list[str], saved_log: dict) -> dict | None:
+    patient_profile = await find_patient_profile_for_aliases(patient_aliases)
+
+    if not patient_profile:
+        return None
+
+    payload = build_prediction_payload(patient_id, patient_profile, saved_log)
+
+    if not payload:
+        return None
+
+    result = predict_situation(ML_MODEL_PATH, payload)
+    prediction = result.get("prediction")
+
+    if not prediction:
+        return None
+
+    confidence = result.get("alert", {}).get("confidence")
+    if confidence is None:
+        confidence = result.get("probabilities", {}).get(prediction, 0.0)
+
+    now = datetime.utcnow()
+    trend_date = saved_log["log_date"]
+    trend_document = {
+        "patient_id": patient_id,
+        "prediction": prediction,
+        "confidence": float(confidence or 0.0),
+        "date": now.isoformat(),
+        "log_date": trend_date,
+        "updated_at": now,
+    }
+
+    await database.health_trends.update_one(
+        {
+            "patient_id": {"$in": patient_aliases},
+            "log_date": trend_date,
+        },
+        {
+            "$set": trend_document,
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )
+
+    return trend_document
 
 
 async def build_patient_aliases_from_profile(
@@ -238,7 +362,16 @@ async def create_health_log(
     if not saved_log:
         raise HTTPException(status_code=500, detail="Saved daily health log could not be loaded")
 
-    return serialize_health_log(saved_log)
+    serialized_log = serialize_health_log(saved_log)
+
+    try:
+        prediction = await save_prediction_for_log(patient_id, patient_aliases, saved_log)
+        if prediction:
+            serialized_log["prediction"] = prediction
+    except Exception as exc:
+        serialized_log["prediction_error"] = f"Daily log saved, but prediction could not be generated: {exc}"
+
+    return serialized_log
 
 
 @router.get("/daily_health_logs")

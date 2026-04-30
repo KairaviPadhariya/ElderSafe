@@ -4,7 +4,8 @@ import { Building2, FileText, Mail, Phone, Save, Stethoscope, UserRound } from '
 import BackButton from '../components/BackButton';
 import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 function DoctorDetails() {
     const navigate = useNavigate();

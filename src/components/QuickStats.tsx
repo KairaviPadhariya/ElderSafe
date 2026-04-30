@@ -5,7 +5,8 @@ import { Heart, Droplet, Stethoscope } from 'lucide-react';
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 import { getWeeklyAverageVitals, roundAverage } from '../utils/patientData';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyHealthLog = {
@@ -16,6 +17,7 @@ type DailyHealthLog = {
   heart_rate?: number;
   fasting_blood_glucose?: number;
   post_prandial_glucose?: number;
+  cholesterol?: number;
   o2_saturation?: number;
 };
 
@@ -197,6 +199,11 @@ function QuickStats({ patientId }: QuickStatsProps) {
         .map((log) => log.post_prandial_glucose)
         .filter((value): value is number => typeof value === 'number')
     );
+    const averageCholesterol = roundAverage(
+      weeklyLogs
+        .map((log) => log.cholesterol)
+        .filter((value): value is number => typeof value === 'number')
+    );
     const weeklySummary = weeklyLogs.length === 1 ? '1 entry this week' : `${weeklyLogs.length} entries this week`;
 
     return {
@@ -208,6 +215,7 @@ function QuickStats({ patientId }: QuickStatsProps) {
       averageOxygen,
       averageFbs,
       averagePpbs,
+      averageCholesterol,
       weeklySummary
     };
   }, [logs]);
@@ -222,7 +230,7 @@ function QuickStats({ patientId }: QuickStatsProps) {
       const gender = profile?.gender ?? null;
       const weight = profile?.weight ?? null;
       const bmi = profile?.bmi ?? calculateBmi(weight, profile?.height);
-      const cholesterol = profile?.cholesterol ?? null;
+      const cholesterol = weeklyMetrics.averageCholesterol ?? profile?.cholesterol ?? null;
 
       const requiredValues = [
         age,

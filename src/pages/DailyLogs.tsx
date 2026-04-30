@@ -5,7 +5,8 @@ import { Save, Activity, Heart, Droplets, FileText } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { createActivityLog } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogFormState = {
@@ -15,6 +16,7 @@ type DailyLogFormState = {
     o2Saturation: string;
     fastingBloodGlucose: string;
     postPrandialGlucose: string;
+    cholesterol: string;
     temperature: string;
     notes: string;
 };
@@ -28,6 +30,7 @@ type DailyLogResponse = {
     o2_saturation?: number;
     fasting_blood_glucose?: number;
     post_prandial_glucose?: number;
+    cholesterol?: number;
     weight?: number;
     temperature?: number;
     notes?: string;
@@ -46,6 +49,7 @@ function createEmptyFormState(): DailyLogFormState {
         o2Saturation: '',
         fastingBloodGlucose: '',
         postPrandialGlucose: '',
+        cholesterol: '',
         temperature: '',
         notes: ''
     };
@@ -157,6 +161,7 @@ function DailyLogs() {
                     o2Saturation: log.o2_saturation != null ? String(log.o2_saturation) : '',
                     fastingBloodGlucose: log.fasting_blood_glucose != null ? String(log.fasting_blood_glucose) : '',
                     postPrandialGlucose: log.post_prandial_glucose != null ? String(log.post_prandial_glucose) : '',
+                    cholesterol: log.cholesterol != null ? String(log.cholesterol) : '',
                     temperature: log.temperature != null ? String(log.temperature) : '',
                     notes: log.notes ?? ''
                 });
@@ -210,6 +215,7 @@ function DailyLogs() {
                     o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
                     fasting_blood_glucose: formData.fastingBloodGlucose ? Number(formData.fastingBloodGlucose) : null,
                     post_prandial_glucose: formData.postPrandialGlucose ? Number(formData.postPrandialGlucose) : null,
+                    cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
                     temperature: formData.temperature ? Number(formData.temperature) : null,
                     notes: formData.notes.trim() || null
                 })
@@ -228,6 +234,7 @@ function DailyLogs() {
                     o2_saturation: formData.o2Saturation ? Number(formData.o2Saturation) : null,
                     fasting_blood_glucose: formData.fastingBloodGlucose ? Number(formData.fastingBloodGlucose) : null,
                     post_prandial_glucose: formData.postPrandialGlucose ? Number(formData.postPrandialGlucose) : null,
+                    cholesterol: formData.cholesterol ? Number(formData.cholesterol) : null,
                     temperature: formData.temperature ? Number(formData.temperature) : null,
                     notes_present: Boolean(formData.notes.trim()),
                     actor_role: role,
@@ -290,6 +297,7 @@ function DailyLogs() {
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Heart Rate</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Oxygen</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Glucose</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cholesterol</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Notes</th>
                                     </tr>
                                 </thead>
@@ -304,6 +312,9 @@ function DailyLogs() {
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{entry.o2_saturation ?? '--'}%</td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
                                                 F: {entry.fasting_blood_glucose ?? '--'} / PP: {entry.post_prandial_glucose ?? '--'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                                {entry.cholesterol ?? '--'} mg/dL
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
                                                 {entry.notes || 'No notes'}
@@ -413,6 +424,19 @@ function DailyLogs() {
                                     type="number"
                                     name="postPrandialGlucose"
                                     value={formData.postPrandialGlucose}
+                                    onChange={handleChange}
+                                    disabled={initialLoading || loading}
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"
+                                    placeholder="mg/dL"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Cholesterol</label>
+                                <input
+                                    type="number"
+                                    name="cholesterol"
+                                    step="0.1"
+                                    value={formData.cholesterol}
                                     onChange={handleChange}
                                     disabled={initialLoading || loading}
                                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white disabled:opacity-70"

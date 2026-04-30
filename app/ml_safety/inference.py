@@ -7,7 +7,7 @@ import pandas as pd
 
 from app.ml_safety.alerting import build_alert_payload
 from app.ml_safety.preprocessing import BOOLEAN_COLUMNS, add_engineered_features
-from app.ml_safety.thresholds import classify_risk, derive_personalized_baseline
+from app.ml_safety.thresholds import classify_risk, derive_personalized_baseline, estimate_rule_confidence
 from app.ml_safety.trainer import load_model
 
 
@@ -39,7 +39,7 @@ def predict_situation(model_path: str | Path, patient_payload: dict[str, Any]) -
     features = add_engineered_features(frame)
     features = _align_features_for_model(model, features)
     features[BOOLEAN_COLUMNS] = features[BOOLEAN_COLUMNS].astype("int64")
-    prediction = model.predict(features)[0]
+    model_prediction = model.predict(features)[0]
 
     probabilities: dict[str, float] = {}
     if hasattr(model, "predict_proba"):
@@ -49,10 +49,16 @@ def predict_situation(model_path: str | Path, patient_payload: dict[str, Any]) -
 
     baseline = derive_personalized_baseline(patient_payload)
     rule_based_label = classify_risk(patient_payload)
+    prediction = rule_based_label
+    probabilities[prediction] = max(
+        probabilities.get(prediction, 0.0),
+        estimate_rule_confidence(patient_payload, prediction),
+    )
     alert_payload = build_alert_payload(prediction, probabilities, patient_payload)
 
     return {
         "prediction": prediction,
+        "model_prediction": model_prediction,
         "rule_based_label": rule_based_label,
         "probabilities": probabilities,
         "personalized_baseline": baseline.__dict__,

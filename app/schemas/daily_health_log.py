@@ -11,6 +11,7 @@ class DailyHealthLogCreate(BaseModel):
     o2_saturation: Optional[int] = None
     fasting_blood_glucose: Optional[int] = None
     post_prandial_glucose: Optional[int] = None
+    cholesterol: Optional[float] = None
     weight: Optional[float] = None
     temperature: Optional[float] = None
     notes: Optional[str] = None

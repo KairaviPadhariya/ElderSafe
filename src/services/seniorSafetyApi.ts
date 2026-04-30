@@ -3,7 +3,6 @@ const ML_API_URL = (import.meta.env.VITE_ML_API_URL || DEFAULT_ML_API_URL).repla
 const ML_API_CANDIDATES = Array.from(
   new Set([
     ML_API_URL,
-    "http://34.233.187.127:8000",
     "http://127.0.0.1:8010"
   ])
 );
@@ -38,7 +37,7 @@ async function requestMlJson(path: string, options: RequestInit = {}) {
       const data = text ? JSON.parse(text) : null;
 
       if (!response.ok) {
-        throw new Error(data?.detail || data?.message || "ML request failed");
+        throw new Error(formatApiError(data, "ML request failed"));
       }
 
       return data;
@@ -55,6 +54,53 @@ async function requestMlJson(path: string, options: RequestInit = {}) {
   throw new Error(
     `Could not connect to the ML prediction service. Tried ${ML_API_CANDIDATES.join(", ")}. Start the ML backend or set VITE_ML_API_URL to the correct address.${lastConnectionError ? "" : ""}`
   );
+}
+
+function formatApiError(data: unknown, fallback: string): string {
+  if (!data) {
+    return fallback;
+  }
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item) => formatApiError(item, fallback)).join("; ");
+  }
+
+  if (typeof data === "object") {
+    const errorData = data as {
+      detail?: unknown;
+      message?: unknown;
+      msg?: unknown;
+      loc?: unknown;
+    };
+
+    if (errorData.detail) {
+      return formatApiError(errorData.detail, fallback);
+    }
+
+    if (errorData.message) {
+      return formatApiError(errorData.message, fallback);
+    }
+
+    if (errorData.msg) {
+      const location = Array.isArray(errorData.loc)
+        ? errorData.loc.filter((part) => part !== "body").join(".")
+        : "";
+      const message = formatApiError(errorData.msg, fallback);
+      return location ? `${location}: ${message}` : message;
+    }
+
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return String(data);
 }
 
 export const trainSafetyModels = async (

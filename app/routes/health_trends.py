@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import database
-from app.routes.daily_health_logs import resolve_requested_patient_context
+from app.routes.daily_health_logs import resolve_requested_patient_context, save_prediction_for_log
 from app.schemas.health_trend import HealthTrendCreate
 from app.utils.auth import verify_token
 
@@ -34,6 +34,18 @@ def parse_trend_timestamp(trend: dict) -> datetime:
                 continue
 
     return datetime.min
+
+
+async def backfill_missing_predictions(patient_id: str, patient_aliases: list[str]) -> None:
+    async for log in database.daily_health_logs.find({"patient_id": {"$in": patient_aliases}}):
+        log_date = log.get("log_date")
+        if not log_date:
+            continue
+
+        try:
+            await save_prediction_for_log(patient_id, patient_aliases, log)
+        except Exception:
+            continue
 
 
 @router.post("/health_trends")
@@ -87,11 +99,13 @@ async def get_trends(
     patient_id: str | None = Query(default=None),
     current_user: dict = Depends(verify_token)
 ):
-    _, patient_aliases = await resolve_requested_patient_context(current_user, patient_id)
+    resolved_patient_id, patient_aliases = await resolve_requested_patient_context(current_user, patient_id)
     query = {"patient_id": {"$in": patient_aliases}}
     trends_by_day: dict[str, dict] = {}
 
     try:
+        await backfill_missing_predictions(resolved_patient_id, patient_aliases)
+
         async for trend in database.health_trends.find(query).sort([("log_date", -1), ("updated_at", -1), ("created_at", -1)]):
             serialized_trend = serialize_trend(trend)
             log_date = serialized_trend.get("log_date") or serialized_trend.get("date", "")[:10]

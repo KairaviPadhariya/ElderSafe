@@ -30,10 +30,22 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
+LOCAL_DEV_ORIGIN_REGEX = (
+    r"^https?://("
+    r"localhost|"
+    r"127\.0\.0\.1|"
+    r"0\.0\.0\.0|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
+    r")(:\d+)?$"
+)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

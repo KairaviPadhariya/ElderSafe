@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ArrowRight, Heart, Lock, Mail } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 function ForgotPassword() {
     const navigate = useNavigate();

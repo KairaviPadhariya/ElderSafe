@@ -41,6 +41,7 @@ def derive_personalized_baseline(patient: dict) -> PersonalizedBaseline:
 
 def classify_risk(patient: dict) -> str:
     baseline = derive_personalized_baseline(patient)
+    has_bp_or_cardiac_history = bool(patient.get("has_hypertension", False)) or bool(patient.get("has_cardiac_history", False))
 
     sbp = float(patient["sbp"])
     dbp = float(patient["dbp"])
@@ -49,6 +50,21 @@ def classify_risk(patient: dict) -> str:
     fbs = float(patient["fbs"])
     ppbs = float(patient["ppbs"])
     cholesterol = float(patient["cholesterol"])
+
+    if has_bp_or_cardiac_history:
+        emergency_bp_checks = [
+            sbp >= baseline.sbp + 15,
+            dbp >= baseline.dbp + 15,
+        ]
+        if any(emergency_bp_checks):
+            return "emergency"
+
+        warning_bp_checks = [
+            sbp >= baseline.sbp + 10,
+            dbp >= baseline.dbp + 10,
+        ]
+        if any(warning_bp_checks):
+            return "warning"
 
     emergency_checks = [
         abs(sbp - baseline.sbp) > 30,
@@ -75,4 +91,28 @@ def classify_risk(patient: dict) -> str:
         return "warning"
 
     return "normal"
+
+
+def estimate_rule_confidence(patient: dict, label: str) -> float:
+    baseline = derive_personalized_baseline(patient)
+    has_bp_or_cardiac_history = bool(patient.get("has_hypertension", False)) or bool(patient.get("has_cardiac_history", False))
+
+    sbp_delta = float(patient["sbp"]) - baseline.sbp
+    dbp_delta = float(patient["dbp"]) - baseline.dbp
+
+    if has_bp_or_cardiac_history and label == "emergency":
+        strongest_delta = max(sbp_delta, dbp_delta)
+        return round(min(0.99, 0.85 + max(0.0, strongest_delta - 15) / 100), 4)
+
+    if has_bp_or_cardiac_history and label == "warning":
+        strongest_delta = max(sbp_delta, dbp_delta)
+        return round(min(0.84, 0.65 + max(0.0, strongest_delta - 10) / 50), 4)
+
+    if label == "emergency":
+        return 0.88
+
+    if label == "warning":
+        return 0.72
+
+    return 0.9
 

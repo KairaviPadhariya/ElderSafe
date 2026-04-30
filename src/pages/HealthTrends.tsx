@@ -1,17 +1,20 @@
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Droplets, Heart, TrendingUp, Thermometer } from 'lucide-react';
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, Droplets, Heart, TrendingUp, Thermometer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const CURRENT_HOST_API_BASE_URL =
+  typeof window === 'undefined' ? '' : `${window.location.protocol}//${window.location.hostname}:8000`;
 const API_BASE_URL_CANDIDATES = Array.from(new Set([
   API_BASE_URL,
+  CURRENT_HOST_API_BASE_URL,
   DEFAULT_API_BASE_URL,
-  'http://34.233.187.127:8000'
-].map((value) => value.replace(/\/$/, ''))));
+  'http://localhost:8000'
+].filter(Boolean).map((value) => value.replace(/\/$/, ''))));
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DailyLogResponse = {
@@ -23,6 +26,7 @@ type DailyLogResponse = {
   o2_saturation?: number;
   fasting_blood_glucose?: number;
   post_prandial_glucose?: number;
+  cholesterol?: number;
   weight?: number;
   temperature?: number;
   notes?: string;
@@ -51,6 +55,7 @@ type MultiLineChartCardProps = {
 };
 
 type RiskHistoryEntry = {
+  log_date?: string;
   date: string;
   prediction: 'normal' | 'warning' | 'emergency';
   confidence: number;
@@ -76,7 +81,11 @@ async function requestJson(url: string, options: RequestInit = {}) {
     return data;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Request timed out. Please check that the backend and MongoDB are running.');
+      throw new Error(`Request timed out for ${url}. Please check that the backend and MongoDB are running.`);
+    }
+
+    if (error instanceof TypeError) {
+      throw new TypeError(`Failed to fetch ${url}. Check that this address is reachable from the browser.`);
     }
 
     throw error;
@@ -150,18 +159,19 @@ function getLocalDateKey(value: string) {
   return `${year}-${month}-${day}`;
 }
 
-function getRiskCalendarMonth(entries: RiskHistoryEntry[]) {
-  const latestEntry = entries[entries.length - 1];
-  const baseDate = latestEntry ? new Date(latestEntry.date) : new Date();
-
-  if (Number.isNaN(baseDate.getTime())) {
-    return new Date();
-  }
-
-  return new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+function getRiskEntryDateKey(entry: RiskHistoryEntry) {
+  return entry.log_date || getLocalDateKey(entry.date);
 }
 
-function buildRiskCalendarDays(monthDate: Date, entries: RiskHistoryEntry[]) {
+function getDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function buildRiskCalendarDays(monthDate: Date, logs: DailyLogResponse[], predictions: RiskHistoryEntry[]) {
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const calendarStart = new Date(monthStart);
@@ -170,20 +180,23 @@ function buildRiskCalendarDays(monthDate: Date, entries: RiskHistoryEntry[]) {
   const calendarEnd = new Date(monthEnd);
   calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
 
-  const latestEntryByDate = new Map(entries.map((entry) => [getLocalDateKey(entry.date), entry]));
+  const logByDate = new Map(logs.map((log) => [log.log_date, log]));
+  const latestEntryByDate = new Map(predictions.map((entry) => [getRiskEntryDateKey(entry), entry]));
   const days: Array<{
     key: string;
     dateNumber: number;
     isCurrentMonth: boolean;
+    log?: DailyLogResponse;
     entry?: RiskHistoryEntry;
   }> = [];
 
   for (let cursor = new Date(calendarStart); cursor <= calendarEnd; cursor.setDate(cursor.getDate() + 1)) {
-    const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    const dateKey = getDateKey(cursor);
     days.push({
       key: dateKey,
       dateNumber: cursor.getDate(),
       isCurrentMonth: cursor.getMonth() === monthDate.getMonth(),
+      log: logByDate.get(dateKey),
       entry: latestEntryByDate.get(dateKey),
     });
   }
@@ -372,6 +385,10 @@ function HealthTrends() {
   const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'risk'>('weekly');
   const [riskHistory, setRiskHistory] = useState<RiskHistoryEntry[]>([]);
   const [linkedPatientId, setLinkedPatientId] = useState('');
+  const [riskCalendarMonth, setRiskCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
   const loadLogs = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -467,7 +484,7 @@ function HealthTrends() {
 
     for (let index = riskHistory.length - 1; index >= 0; index -= 1) {
       const entry = riskHistory[index];
-      const dateKey = getLocalDateKey(entry.date);
+      const dateKey = getRiskEntryDateKey(entry);
 
       if (!latestRiskByDay.has(dateKey)) {
         latestRiskByDay.set(dateKey, entry);
@@ -477,11 +494,40 @@ function HealthTrends() {
     return Array.from(latestRiskByDay.values()).reverse();
   }, [riskHistory]);
 
-  const riskCalendarMonth = useMemo(() => getRiskCalendarMonth(dailyRiskHistory), [dailyRiskHistory]);
+  useEffect(() => {
+    const latestLog = entries[entries.length - 1];
+    const latestPrediction = dailyRiskHistory[dailyRiskHistory.length - 1];
+    const preferredDate = latestLog?.log_date || (latestPrediction ? getRiskEntryDateKey(latestPrediction) : '');
+
+    if (!preferredDate) {
+      return;
+    }
+
+    setRiskCalendarMonth((current) => {
+      const preferredMonth = new Date(`${preferredDate}T00:00:00`);
+      if (Number.isNaN(preferredMonth.getTime())) {
+        return current;
+      }
+
+      if (
+        current.getFullYear() === preferredMonth.getFullYear()
+        && current.getMonth() === preferredMonth.getMonth()
+      ) {
+        return current;
+      }
+
+      return new Date(preferredMonth.getFullYear(), preferredMonth.getMonth(), 1);
+    });
+  }, [dailyRiskHistory, entries]);
+
   const riskCalendarDays = useMemo(
-    () => buildRiskCalendarDays(riskCalendarMonth, dailyRiskHistory),
-    [dailyRiskHistory, riskCalendarMonth]
+    () => buildRiskCalendarDays(riskCalendarMonth, entries, dailyRiskHistory),
+    [dailyRiskHistory, entries, riskCalendarMonth]
   );
+  const riskMonthValue = String(riskCalendarMonth.getMonth());
+  const riskYearValue = String(riskCalendarMonth.getFullYear());
+  const visibleMonthLogs = riskCalendarDays.filter((day) => day.isCurrentMonth && day.log).length;
+  const visibleMonthPredictions = riskCalendarDays.filter((day) => day.isCurrentMonth && day.entry).length;
   const riskLegend = [
     {
       label: 'Normal',
@@ -552,7 +598,7 @@ function HealthTrends() {
         ],
       }));
 
-    const bodyMetrics = filteredEntries
+    const temperature = filteredEntries
       .filter((entry) => entry.temperature != null)
       .map((entry) => {
         let temp = entry.temperature as number;
@@ -570,11 +616,21 @@ function HealthTrends() {
         };
       });
 
+    const cholesterol = filteredEntries
+      .filter((entry) => entry.cholesterol != null)
+      .map((entry) => ({
+        label: formatDateLabel(entry.log_date),
+        values: [
+          { label: 'Cholesterol', value: entry.cholesterol as number, color: '#06b6d4' }
+        ],
+      }));
+
     return {
       bloodPressure,
       heartAndOxygen,
       glucose,
-      bodyMetrics,
+      temperature,
+      cholesterol,
     };
   }, [filteredEntries]);
 
@@ -679,28 +735,95 @@ function HealthTrends() {
               </div>
             </div>
 
-            {dailyRiskHistory.length === 0 ? (
+            {entries.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No risk history yet. Refresh the dashboard prediction card to start building a timeline.
+                No daily logs found in the database yet. Save daily logs first, then predictions will appear on this calendar.
               </div>
             ) : (
               <>
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                      {riskCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-emerald-500" />
+                      <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                        {riskCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      One saved prediction per day, using the latest prediction for that date.
+                      Showing {visibleMonthPredictions} predictions from {visibleMonthLogs} saved daily logs in this month.
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {riskLegend.map((item) => (
-                      <span key={item.label} className={`rounded-full px-3 py-1 text-xs font-semibold ${item.classes}`}>
-                        {item.label}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/50">
+                      <button
+                        type="button"
+                        onClick={() => setRiskCalendarMonth((current) => addMonths(current, -1))}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white hover:text-emerald-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        aria-label="Previous month"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          setRiskCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                        }}
+                        className="h-9 rounded-lg px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-white hover:text-emerald-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRiskCalendarMonth((current) => addMonths(current, 1))}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white hover:text-emerald-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        aria-label="Next month"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <select
+                      value={riskMonthValue}
+                      onChange={(event) => {
+                        setRiskCalendarMonth((current) => new Date(current.getFullYear(), Number(event.target.value), 1));
+                      }}
+                      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-emerald-900/40"
+                      aria-label="Select month"
+                    >
+                      {Array.from({ length: 12 }, (_, monthIndex) => (
+                        <option key={monthIndex} value={monthIndex}>
+                          {new Date(2026, monthIndex, 1).toLocaleDateString(undefined, { month: 'long' })}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min="2000"
+                      max="2100"
+                      value={riskYearValue}
+                      onChange={(event) => {
+                        const nextYear = Number(event.target.value);
+                        if (nextYear >= 2000 && nextYear <= 2100) {
+                          setRiskCalendarMonth((current) => new Date(nextYear, current.getMonth(), 1));
+                        }
+                      }}
+                      className="h-10 w-24 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-emerald-900/40"
+                      aria-label="Select year"
+                    />
                   </div>
+                </div>
+
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {riskLegend.map((item) => (
+                    <span key={item.label} className={`rounded-full px-3 py-1 text-xs font-semibold ${item.classes}`}>
+                      {item.label}
+                    </span>
+                  ))}
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                    Log saved, prediction pending
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-7 gap-2">
@@ -711,10 +834,17 @@ function HealthTrends() {
                   ))}
 
                   {riskCalendarDays.map((day) => {
-                    const predictionClasses = !day.entry
-                      ? 'bg-slate-50 text-slate-400 dark:bg-slate-900/40 dark:text-slate-500'
+                    const isHighConfidenceEmergency = Boolean(
+                      day.entry?.prediction === 'emergency' && day.entry.confidence > 0.85
+                    );
+                    const predictionClasses = !day.log
+                      ? 'bg-slate-50 text-slate-300 dark:bg-slate-900/30 dark:text-slate-600'
+                      : !day.entry
+                        ? 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900/70 dark:text-slate-300 dark:ring-slate-700'
                       : day.entry.prediction === 'emergency'
-                        ? 'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50'
+                        ? isHighConfidenceEmergency
+                          ? 'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50'
+                          : 'bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:ring-orange-900/50'
                         : day.entry.prediction === 'warning'
                           ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50'
                           : 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/50';
@@ -733,13 +863,18 @@ function HealthTrends() {
                           ) : null}
                         </div>
                         {day.entry ? (
-                          <div className="mt-4">
+                          <div className="mt-3">
                             <p className="text-xs font-semibold">
                               {formatRiskLabel(day.entry.prediction)}
                             </p>
                             <p className="mt-1 text-xs opacity-80">
                               {Math.round(day.entry.confidence * 100)}%
                             </p>
+                          </div>
+                        ) : day.log ? (
+                          <div className="mt-3">
+                            <p className="text-xs font-semibold">Log saved</p>
+                            <p className="mt-1 text-xs opacity-75">Prediction pending</p>
                           </div>
                         ) : null}
                       </div>
@@ -780,8 +915,15 @@ function HealthTrends() {
               title="Temperature Trends"
               subtitle="Body temperature recorded in previous daily logs"
               icon={Thermometer}
-              points={chartData.bodyMetrics}
+              points={chartData.temperature}
               emptyMessage="Add temperature entries to see this chart."
+            />
+            <MultiLineChartCard
+              title="Cholesterol Trends"
+              subtitle="Cholesterol recorded in previous daily logs"
+              icon={Activity}
+              points={chartData.cholesterol}
+              emptyMessage="Add cholesterol entries to see this chart."
             />
           </div>
         )}
