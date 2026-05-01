@@ -5,7 +5,7 @@ import { Save, Activity, Heart, Droplets, FileText } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { createActivityLog } from '../utils/logging';
 
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const DEFAULT_API_BASE_URL = 'http://100.50.8.161:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
@@ -43,8 +43,8 @@ type FamilyRecord = {
 
 function createEmptyFormState(): DailyLogFormState {
     return {
-        systolicBp: '120',
-        diastolicBp: '80',
+        systolicBp: '',
+        diastolicBp: '',
         heartRate: '',
         o2Saturation: '',
         fastingBloodGlucose: '',
@@ -113,7 +113,7 @@ function DailyLogs() {
         }));
     };
 
-    const loadLogs = useCallback(async () => {
+    const loadLogs = useCallback(async (syncForm = true) => {
         const token = localStorage.getItem('token');
 
         if (!token) {
@@ -151,6 +151,10 @@ function DailyLogs() {
             const todayLog = Array.isArray(todayData) ? todayData[0] : null;
             const allLogs = Array.isArray(allLogsData) ? allLogsData as DailyLogResponse[] : [];
             setDailyEntries(allLogs);
+
+            if (!syncForm) {
+                return;
+            }
 
             if (todayLog) {
                 const log = todayLog as DailyLogResponse;
@@ -243,7 +247,8 @@ function DailyLogs() {
             });
 
             setSuccessMessage(`${isFamilyView ? 'Patient' : 'Health'} log saved for ${todayDate}.`);
-            await loadLogs();
+            setFormData(createEmptyFormState());
+            await loadLogs(false);
         } catch (saveError) {
             console.error('Failed to save daily health log:', saveError);
             setError(saveError instanceof Error ? saveError.message : "Unable to save today's health log.");

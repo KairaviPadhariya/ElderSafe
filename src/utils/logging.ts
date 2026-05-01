@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 
 type ActivityLogPayload = {
   action: string;

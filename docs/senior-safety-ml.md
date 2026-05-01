@@ -100,7 +100,7 @@ Artifacts are saved in:
 Standalone service entrypoint:
 
 ```powershell
-venv\Scripts\python -m uvicorn app.safety_ml_app:app --host 127.0.0.1 --port 8010 --reload
+venv\Scripts\python -m uvicorn app.safety_ml_app:app --host 0.0.0.0 --port 8010 --reload
 ```
 
 Endpoints:

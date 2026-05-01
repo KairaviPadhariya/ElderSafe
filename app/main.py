@@ -24,6 +24,8 @@ from app.routes import (
 app = FastAPI()
 
 ALLOWED_ORIGINS = [
+    "http://100.50.8.161:5173",
+    "http://100.50.8.161:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
@@ -32,6 +34,7 @@ ALLOWED_ORIGINS = [
 
 LOCAL_DEV_ORIGIN_REGEX = (
     r"^https?://("
+    r"100\.50\.8\.161|"
     r"localhost|"
     r"127\.0\.0\.1|"
     r"0\.0\.0\.0|"

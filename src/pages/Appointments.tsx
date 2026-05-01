@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import BackButton from '../components/BackButton';
 import { logActivitySafely } from '../utils/logging';
 
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const DEFAULT_API_BASE_URL = 'http://100.50.8.161:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 type Appointment = {
