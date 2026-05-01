@@ -3,7 +3,7 @@ import { Heart, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, decodeJWT } from '../utils/api';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 
 function Login() {
     const [email, setEmail] = useState("");

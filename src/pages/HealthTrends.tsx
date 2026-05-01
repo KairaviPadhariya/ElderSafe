@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import BackButton from '../components/BackButton';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 const API_BASE_URL_CANDIDATES = Array.from(new Set([
   API_BASE_URL,
 ].map((value) => value.replace(/\/$/, ''))));

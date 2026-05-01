@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Siren } fr
 
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 const AUTO_SOS_THRESHOLD = 3;
 
