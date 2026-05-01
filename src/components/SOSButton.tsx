@@ -2,7 +2,7 @@ import { Phone, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { logActivitySafely } from '../utils/logging';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 
 type LocationDetails = {
   label: string;

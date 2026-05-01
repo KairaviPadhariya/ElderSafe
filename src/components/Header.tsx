@@ -9,7 +9,7 @@ interface HeaderProps {
   onProfileClick: () => void;
 }
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 
 function Header({ role, onNotificationsClick, onProfileClick }: HeaderProps) {
   const [notificationCount, setNotificationCount] = useState(0);

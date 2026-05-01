@@ -3,7 +3,7 @@ const ML_API_URL = (import.meta.env.VITE_ML_API_URL || DEFAULT_ML_API_URL).repla
 const ML_API_CANDIDATES = Array.from(
   new Set([
     ML_API_URL,
-    "http://34.233.187.127:8000",
+    "http://100.50.8.161:8000",
     "http://127.0.0.1:8010"
   ])
 );

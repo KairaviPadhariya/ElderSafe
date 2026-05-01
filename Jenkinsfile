@@ -26,9 +26,6 @@ pipeline {
                     docker ps -a --filter "name=backend" -q | xargs -r docker rm -f || true
 
                     docker-compose up -d --build || true
-
-                    docker run -d --name eldersafe-frontend -p 5173:5173 eldersafe-cicd_frontend || true
-                    docker run -d --name eldersafe-backend -p 8000:8000 --env-file .env eldersafe-cicd_backend || true
                     '''
                 }
             }

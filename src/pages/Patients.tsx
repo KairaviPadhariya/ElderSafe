@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 
-const API_BASE_URL = 'http://34.233.187.127:8000';
+const API_BASE_URL = 'http://100.50.8.161:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
 type DashboardAppointment = {
