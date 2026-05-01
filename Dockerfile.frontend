@@ -10,6 +10,7 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+COPY .env .env
 
 # ✅ Debug (optional but useful)
 RUN echo "API URL is $VITE_API_BASE_URL"
