@@ -1,9 +1,9 @@
-const DEFAULT_ML_API_URL = "http://100.50.8.161:8010";
+const DEFAULT_ML_API_URL = "http://10.22.60.236:8010";
 const ML_API_URL = (import.meta.env.VITE_ML_API_URL || DEFAULT_ML_API_URL).replace(/\/$/, "");
 const ML_API_CANDIDATES = Array.from(
   new Set([
     ML_API_URL,
-    "http://100.50.8.161:8010"
+    "http://10.22.60.236:8010"
   ])
 );
 

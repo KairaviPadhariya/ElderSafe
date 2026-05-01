@@ -4,6 +4,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends
 
 from app.database import database
+from app.ml_safety.thresholds import is_daily_health_log_abnormal
 from app.schemas.notification import NotificationCreate
 from app.utils.auth import verify_token
 
@@ -80,24 +81,6 @@ def parse_appointment_datetime(appointment: dict) -> datetime | None:
             continue
 
     return None
-
-
-def is_health_log_abnormal(log: dict) -> bool:
-    systolic = log.get("systolic_bp")
-    diastolic = log.get("diastolic_bp")
-    heart_rate = log.get("heart_rate")
-    fasting = log.get("fasting_blood_glucose")
-    post_prandial = log.get("post_prandial_glucose")
-    temperature = log.get("temperature")
-
-    return any([
-        systolic is not None and systolic >= 140,
-        diastolic is not None and diastolic >= 90,
-        heart_rate is not None and (heart_rate < 60 or heart_rate > 100),
-        fasting is not None and fasting >= 126,
-        post_prandial is not None and post_prandial >= 200,
-        temperature is not None and temperature >= 38.0,
-    ])
 
 
 async def get_user_name(user_id: str) -> str:
@@ -336,7 +319,7 @@ async def build_patient_notifications(current_user: dict):
         )
 
     latest_log = await get_latest_health_log(patient_id)
-    if latest_log and is_health_log_abnormal(latest_log):
+    if latest_log and is_daily_health_log_abnormal(latest_log):
         notifications.append(
             build_notification(
                 f"health-log-alert-{latest_log['_id']}",
@@ -424,7 +407,7 @@ async def build_family_notifications(current_user: dict):
         )
 
     latest_log = await get_latest_health_log(patient_reference)
-    if latest_log and is_health_log_abnormal(latest_log):
+    if latest_log and is_daily_health_log_abnormal(latest_log):
         notifications.append(
             build_notification(
                 f"family-health-log-alert-{latest_log['_id']}",
@@ -505,7 +488,7 @@ async def build_doctor_notifications(current_user: dict):
         patient_name = await get_user_name(patient_id)
 
         latest_log = await get_latest_health_log(patient_id)
-        if latest_log and is_health_log_abnormal(latest_log):
+        if latest_log and is_daily_health_log_abnormal(latest_log):
             notifications.append(
                 build_notification(
                     f"doctor-health-alert-{latest_log['_id']}",

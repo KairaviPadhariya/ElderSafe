@@ -16,7 +16,7 @@ interface Notification {
   priority?: string;
 }
 
-const DEFAULT_API_BASE_URL = 'http://100.50.8.161:8000';
+const DEFAULT_API_BASE_URL = 'http://10.22.60.236:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 function NotificationsPanel({ isOpen, onClose, role }: NotificationsPanelProps) {

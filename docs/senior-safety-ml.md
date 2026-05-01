@@ -75,7 +75,24 @@ Core files:
 - `app/ml_safety/preprocessing.py`
 - `app/ml_safety/thresholds.py`
 
-## 4. Models
+## 4. Rule-based health entry ranges
+
+Daily health log notifications use these fixed rule ranges from `app/ml_safety/thresholds.py`. The ML prediction endpoint still applies personalized baselines for disease-aware risk scoring.
+
+| Health entry | Normal | Warning | Emergency |
+| --- | --- | --- | --- |
+| Systolic BP | 90-139 mmHg | 140-179 mmHg or below 90 | 180 mmHg or higher |
+| Diastolic BP | 60-89 mmHg | 90-119 mmHg or below 60 | 120 mmHg or higher |
+| Heart rate | 60-100 bpm | 101-129 bpm or 50-59 bpm | 130 bpm or higher, or below 50 bpm |
+| Oxygen saturation | 95-100% | 90-94% | 89% or lower |
+| Fasting blood glucose | 70-99 mg/dL | 100-125 mg/dL or below 70 | 126 mg/dL or higher |
+| Post-prandial glucose | 70-139 mg/dL | 140-199 mg/dL or below 70 | 200 mg/dL or higher |
+| Total cholesterol | 0-199 mg/dL | 200-239 mg/dL | 240 mg/dL or higher |
+| Temperature | 36.1-37.2 C | 37.3-37.9 C or 35.0-36.0 C | 38.0 C or higher, or below 35.0 C |
+
+Any warning or emergency value marks a daily log as abnormal for family, patient, and doctor notifications.
+
+## 5. Models
 
 Three classifiers are trained and compared:
 
@@ -95,12 +112,12 @@ Artifacts are saved in:
 - `artifacts/ml_safety/dataset/`
 - `artifacts/ml_safety/models/`
 
-## 5. FastAPI service
+## 6. FastAPI service
 
 Standalone service entrypoint:
 
 ```powershell
-venv\Scripts\python -m uvicorn app.safety_ml_app:app --host 0.0.0.0 --port 8010 --reload
+venv\Scripts\python -m uvicorn app.safety_ml_app:app --host 100.50.8.161 --port 8010 --reload
 ```
 
 Endpoints:
@@ -163,7 +180,7 @@ The response includes:
 - personalized baseline
 - alert routing payload
 
-## 6. Frontend integration
+## 7. Frontend integration
 
 No existing frontend files were changed. A new helper client was added:
 
@@ -210,7 +227,7 @@ Suggested UI flow:
 - if response alert status is `warning` or `emergency`, show banner on doctor dashboard and notify family dashboard
 - use `monitorSafetyTrend` for a rolling 3-day summary
 
-## 7. Alerting design
+## 8. Alerting design
 
 The current prototype returns a channel plan instead of sending real SMS or email directly.
 
@@ -222,7 +239,7 @@ Recommended production wiring:
 - save generated alerts into the existing notifications collection
 - publish websocket or polling updates to React dashboards
 
-## 8. Optional integration with the existing FastAPI app
+## 9. Optional integration with the existing FastAPI app
 
 To keep the current backend untouched, the ML module runs as a separate service today.
 
@@ -235,7 +252,7 @@ app.include_router(ml_safety_router)
 
 That step was intentionally not applied because your constraint forbids modifying current backend files.
 
-## 9. Suggestions for improvement
+## 10. Suggestions for improvement
 
 - replace synthetic data with real wearable or hospital data
 - add time-series anomaly detection for continuous streaming
