@@ -1,5 +1,4 @@
-const DEFAULT_API_URL = "http://100.50.8.161:8000";
-const API_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_URL).replace(/\/$/, "");
+const API_URL = "http://100.50.8.161:8000";
 
 export const registerUser = async (name: string, email: string, password: string, role: string) => {
   const response = await fetch(`${API_URL}/users`, {
