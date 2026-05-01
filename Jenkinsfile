@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     stages {
-
         stage('Build Backend Image') {
             steps {
                 dir("${WORKSPACE}") {
@@ -23,8 +22,10 @@ pipeline {
             steps {
                 dir("${WORKSPACE}") {
                     sh '''
-                    docker-compose down || true
-                    docker-compose up -d --build
+                    docker ps -a --filter "name=frontend" -q | xargs -r docker rm -f || true
+                    docker ps -a --filter "name=backend" -q | xargs -r docker rm -f || true
+
+                    docker-compose up -d --build || true
                     '''
                 }
             }

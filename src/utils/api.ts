@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://10.22.60.236:8000';
+const DEFAULT_API_BASE_URL = 'http://100.50.8.161:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
 interface LoginData {
@@ -72,7 +72,7 @@ export const api = {
   async getCurrentUser() {
   const token = localStorage.getItem('token');
 
-  const response = await fetch(`${API_BASE_URL}/users`, {
+  const response = await fetch(`${API_BASE_URL}/users/me`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,

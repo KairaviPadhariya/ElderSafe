@@ -5,7 +5,7 @@ import { Heart, Droplet, Stethoscope } from 'lucide-react';
 import { predictSafetyStatus } from '../services/seniorSafetyApi';
 import { getWeeklyAverageVitals, roundAverage } from '../utils/patientData';
 
-const DEFAULT_API_BASE_URL = 'http://10.22.60.236:8000';
+const DEFAULT_API_BASE_URL = 'http://100.50.8.161:8000';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 12000;
 
