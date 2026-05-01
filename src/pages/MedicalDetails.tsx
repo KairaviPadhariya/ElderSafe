@@ -416,16 +416,6 @@ function MedicalDetails() {
                 }
 
                 setLatestDailyLogDate(latestLog.log_date || '');
-                setFormData((prev) => ({
-                    ...prev,
-                    weight: latestLog.weight !== undefined && latestLog.weight !== null ? String(latestLog.weight) : prev.weight,
-                    o2Saturation: latestLog.o2_saturation !== undefined && latestLog.o2_saturation !== null ? String(latestLog.o2_saturation) : prev.o2Saturation,
-                    heartRate: latestLog.heart_rate !== undefined && latestLog.heart_rate !== null ? String(latestLog.heart_rate) : prev.heartRate,
-                    sbp: latestLog.systolic_bp !== undefined && latestLog.systolic_bp !== null ? String(latestLog.systolic_bp) : prev.sbp,
-                    dbp: latestLog.diastolic_bp !== undefined && latestLog.diastolic_bp !== null ? String(latestLog.diastolic_bp) : prev.dbp,
-                    fbs: latestLog.fasting_blood_glucose !== undefined && latestLog.fasting_blood_glucose !== null ? String(latestLog.fasting_blood_glucose) : prev.fbs,
-                    ppbs: latestLog.post_prandial_glucose !== undefined && latestLog.post_prandial_glucose !== null ? String(latestLog.post_prandial_glucose) : prev.ppbs
-                }));
             } catch (loadError) {
                 console.error('Failed to load latest daily health log:', loadError);
             }
@@ -636,12 +626,6 @@ function MedicalDetails() {
                             <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                                 <Lock className="w-4 h-4" />
                                 Family members can review the linked patient's information here, but cannot edit it.
-                            </div>
-                        )}
-
-                        {latestDailyLogDate && (
-                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                                Latest daily vitals shown below are from {latestDailyLogDate}.
                             </div>
                         )}
 

@@ -117,12 +117,12 @@ def derive_personalized_baseline(patient: dict) -> PersonalizedBaseline:
     has_diabetes = bool(patient.get("has_diabetes", False))
     has_cardiac_history = bool(patient.get("has_cardiac_history", False))
 
-    sbp = 120 + (10 if has_hypertension else 0) + (5 if has_cardiac_history else 0)
-    dbp = 80 + (5 if has_hypertension else 0)
+    sbp = 120 + (20 if has_hypertension else 0) + (5 if has_cardiac_history else 0)
+    dbp = 80 + (10 if has_hypertension else 0)
     hr = 72 + (8 if has_cardiac_history else 0)
-    o2_saturation = 98
+    o2_saturation = 90
     fbs = 95 + (20 if has_diabetes else 0)
-    ppbs = 120 + (40 if has_diabetes else 0)
+    ppbs = 126 + (25 if has_diabetes else 0)
     cholesterol = 180 + (25 if has_cardiac_history else 0)
 
     return PersonalizedBaseline(
