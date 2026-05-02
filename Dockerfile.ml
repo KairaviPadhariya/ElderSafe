@@ -1,0 +1,14 @@
+FROM python:3.11
+
+WORKDIR /app
+
+COPY requirements-ml.txt .
+
+RUN pip install --upgrade pip
+RUN pip install -r requirements-ml.txt
+
+COPY . .
+
+EXPOSE 8010
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]

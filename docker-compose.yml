@@ -19,7 +19,17 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_BASE_URL: http://100.50.8.161:8000
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_ML_API_URL: ${VITE_ML_API_URL}
     ports:
       - "5173:5173"
+    restart: always
+
+  ml:
+    container_name: eldersafe-ml
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    ports:
+      - "8010:8010"
     restart: always

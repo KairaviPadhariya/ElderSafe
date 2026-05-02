@@ -2,22 +2,20 @@ FROM node:20 AS builder
 
 WORKDIR /app
 
-# ✅ Accept build argument
 ARG VITE_API_BASE_URL
+ARG VITE_ML_API_URL
+
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_ML_API_URL=$VITE_ML_API_URL
 
 COPY package*.json ./
 RUN npm install
 
 COPY . .
-COPY .env .env
-
-# ✅ Debug (optional but useful)
-RUN echo "API URL is $VITE_API_BASE_URL"
 
 RUN npm run build
 
-# ----------- PRODUCTION STAGE -----------
+# ---- production ----
 
 FROM node:20
 
